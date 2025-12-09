@@ -63,6 +63,127 @@
       .dark .markdown-preview blockquote { border-left-color: #475569; color: #94a3b8; background-color: #1e293b; }
       .dark .markdown-preview code { background-color: #1e293b; color: #e2e8f0; }
       .dark .markdown-preview hr { border-color: #334155; }
+
+      /* TipTap Rich Text Editor Styles - Light Mode */
+      .ProseMirror {
+        outline: none;
+        min-height: 200px;
+        padding: 0;
+      }
+
+      .ProseMirror p {
+        margin-bottom: 0.75rem;
+        line-height: 1.7;
+        color: #475569;
+      }
+
+      .ProseMirror h1 {
+        font-size: 1.875rem;
+        font-weight: 700;
+        margin: 1.5rem 0 0.75rem;
+        color: #1e293b;
+        letter-spacing: -0.025em;
+      }
+
+      .ProseMirror h2 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 1.25rem 0 0.75rem;
+        color: #334155;
+      }
+
+      .ProseMirror h3 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin: 1rem 0 0.5rem;
+        color: #475569;
+      }
+
+      .ProseMirror ul,
+      .ProseMirror ol {
+        padding-left: 1.5rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .ProseMirror ul {
+        list-style-type: disc;
+      }
+
+      .ProseMirror ol {
+        list-style-type: decimal;
+      }
+
+      .ProseMirror li {
+        margin-bottom: 0.25rem;
+        color: #475569;
+      }
+
+      .ProseMirror strong {
+        font-weight: 600;
+        color: #0f172a;
+      }
+
+      .ProseMirror em {
+        font-style: italic;
+      }
+
+      .ProseMirror u {
+        text-decoration: underline;
+      }
+
+      /* Placeholder styling */
+      .ProseMirror p.is-editor-empty:first-child::before {
+        content: attr(data-placeholder);
+        float: left;
+        color: #cbd5e1;
+        pointer-events: none;
+        height: 0;
+      }
+
+      /* TipTap Rich Text Editor Styles - Dark Mode */
+      .dark .ProseMirror h1 {
+        color: #f1f5f9;
+      }
+
+      .dark .ProseMirror h2 {
+        color: #e2e8f0;
+      }
+
+      .dark .ProseMirror h3 {
+        color: #cbd5e1;
+      }
+
+      .dark .ProseMirror p {
+        color: #cbd5e1;
+      }
+
+      .dark .ProseMirror li {
+        color: #94a3b8;
+      }
+
+      .dark .ProseMirror strong {
+        color: #f8fafc;
+      }
+
+      .dark .ProseMirror p.is-editor-empty:first-child::before {
+        color: #64748b;
+      }
+
+      /* Focus styles for better UX */
+      .ProseMirror:focus {
+        outline: none;
+      }
+
+      /* Selection styling */
+      .ProseMirror ::selection {
+        background-color: #3b82f6;
+        color: white;
+      }
+
+      .dark .ProseMirror ::selection {
+        background-color: #2563eb;
+        color: white;
+      }
     </style>
   <script type="importmap">
 {

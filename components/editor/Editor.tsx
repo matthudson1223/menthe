@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Clock, Sparkles, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { useGoogleLogin } from '@react-oauth/google';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
 import { EditorToolbar } from './EditorToolbar';
@@ -10,8 +11,10 @@ import { TranscriptTab } from './TranscriptTab';
 import { SummaryTab } from './SummaryTab';
 import { useNotesContext } from '../../context/NotesContext';
 import * as geminiService from '../../services/geminiService';
+import * as driveService from '../../services/driveService';
 import { MESSAGES, APP_CONFIG } from '../../constants';
 import { sanitizeFilename, copyToClipboard } from '../../utils/helpers';
+import { tiptapToHTML, tiptapToMarkdown } from '../../utils/tiptapHelpers';
 import type { TabType, SaveStatus } from '../../types';
 
 interface EditorProps {
@@ -30,9 +33,28 @@ export const Editor = React.memo<EditorProps>(({
   const { notes, processing } = useNotesContext();
   const [isFullWidth, setIsFullWidth] = useState(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [driveError, setDriveError] = useState<string | null>(null);
   const pdfContentRef = useRef<HTMLDivElement>(null);
 
   const activeNote = notes.activeNote;
+
+  // Set up Google OAuth login
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        await handleDriveSave(tokenResponse.access_token);
+      } catch (error) {
+        console.error('Drive save error:', error);
+        setDriveError(error instanceof Error ? error.message : 'Failed to save to Google Drive');
+        setSaveStatus('idle');
+      }
+    },
+    onError: () => {
+      setDriveError('Google authentication failed. Please try again.');
+      setSaveStatus('idle');
+    },
+    scope: 'https://www.googleapis.com/auth/drive.file',
+  });
 
   if (!activeNote) {
     return null;
@@ -83,11 +105,15 @@ export const Editor = React.memo<EditorProps>(({
   };
 
   const handleDownloadMarkdown = () => {
+    const userNotesMarkdown = activeNote.userNotes
+      ? tiptapToMarkdown(activeNote.userNotes)
+      : '';
+
     const content = `# ${activeNote.title}
 Date: ${new Date(activeNote.createdAt).toLocaleString()}
 
 ${activeNote.summaryText ? `## Summary\n${activeNote.summaryText}\n` : ''}
-${activeNote.userNotes ? `## User Notes\n${activeNote.userNotes}\n` : ''}
+${userNotesMarkdown ? `## User Notes\n${userNotesMarkdown}\n` : ''}
 ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`;
 
     const blob = new Blob([content], { type: 'text/markdown' });
@@ -118,17 +144,50 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
     }
   };
 
-  const handleSaveToDrive = () => {
-    if (window.confirm(MESSAGES.CONFIRM_SAVE_DRIVE(activeNote.title))) {
-      setSaveStatus('saving');
+  const handleDriveSave = async (accessToken: string) => {
+    if (!activeNote) return;
 
-      // Simulate API interaction
+    setSaveStatus('saving');
+    setDriveError(null);
+
+    try {
+      const fileId = await driveService.saveNoteToDrive(activeNote, accessToken);
+
+      // Update the note with the Drive file ID
+      notes.updateNote(activeNote.id, { driveFileId: fileId });
+
+      setSaveStatus('success');
+
+      // Reset to idle after 2 seconds
       setTimeout(() => {
-        setSaveStatus('success');
-        setTimeout(() => {
-          setSaveStatus('idle');
-        }, 2000);
-      }, 1500);
+        setSaveStatus('idle');
+      }, 2000);
+    } catch (error) {
+      throw error; // Will be caught by googleLogin onSuccess handler
+    }
+  };
+
+  const handleSaveToDrive = () => {
+    if (!activeNote) return;
+
+    // Clear any previous errors
+    setDriveError(null);
+
+    // Check if note has content
+    if (!activeNote.summaryText && !activeNote.userNotes && !activeNote.verbatimText) {
+      setDriveError('Cannot save empty note. Please add some content first.');
+      return;
+    }
+
+    // Show confirmation and initiate Google login/save
+    const action = activeNote.driveFileId ? 'update' : 'save';
+    const confirmMessage = activeNote.driveFileId
+      ? `Update "${activeNote.title}" in Google Drive?`
+      : MESSAGES.CONFIRM_SAVE_DRIVE(activeNote.title);
+
+    if (window.confirm(confirmMessage)) {
+      setSaveStatus('saving');
+      googleLogin();
     }
   };
 
@@ -157,7 +216,11 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
         onDownloadMarkdown={handleDownloadMarkdown}
         onDownloadPDF={handleDownloadPDF}
         onSaveToDrive={handleSaveToDrive}
+        onStartRecording={onStartRecording}
         saveStatus={saveStatus}
+        driveFileId={activeNote.driveFileId}
+        driveError={driveError}
+        onClearDriveError={() => setDriveError(null)}
       />
 
       {/* Title Area */}
@@ -296,9 +359,12 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
               <h2 className="text-xl font-bold border-b border-slate-200 pb-2 mb-4 text-blue-900">
                 User Notes
               </h2>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap font-mono bg-slate-50 p-4 rounded border border-slate-100 text-slate-700">
-                {activeNote.userNotes}
-              </p>
+              <div
+                className="text-sm leading-relaxed text-slate-700 prose max-w-none"
+                dangerouslySetInnerHTML={{
+                  __html: tiptapToHTML(activeNote.userNotes)
+                }}
+              />
             </div>
           )}
 

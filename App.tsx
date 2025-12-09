@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { NotesProvider, useNotesContext } from './context/NotesContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ProcessingOverlay } from './components/ProcessingOverlay';
@@ -114,11 +115,16 @@ function AppContent() {
 }
 
 export default function App() {
+  // Get Google Client ID from environment variable
+  const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
+
   return (
     <ErrorBoundary>
-      <NotesProvider>
-        <AppContent />
-      </NotesProvider>
+      <GoogleOAuthProvider clientId={googleClientId}>
+        <NotesProvider>
+          <AppContent />
+        </NotesProvider>
+      </GoogleOAuthProvider>
     </ErrorBoundary>
   );
 }

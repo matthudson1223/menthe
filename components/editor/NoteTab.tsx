@@ -1,6 +1,8 @@
-import React from 'react';
-import { Textarea } from '../ui';
+import React, { useState } from 'react';
 import type { Note } from '../../types';
+import { RichTextEditor } from './RichTextEditor';
+import { RichTextToolbar } from './RichTextToolbar';
+import type { Editor } from '@tiptap/react';
 
 interface NoteTabProps {
   note: Note;
@@ -9,6 +11,8 @@ interface NoteTabProps {
 }
 
 export const NoteTab = React.memo<NoteTabProps>(({ note, isFullWidth, onUpdate }) => {
+  const [editor, setEditor] = useState<Editor | null>(null);
+
   return (
     <div
       className={`mx-auto transition-all duration-300 ${
@@ -16,11 +20,12 @@ export const NoteTab = React.memo<NoteTabProps>(({ note, isFullWidth, onUpdate }
       }`}
     >
       <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 min-h-[50vh] transition-colors">
-        <textarea
-          value={note.userNotes || ''}
-          onChange={(e) => onUpdate({ userNotes: e.target.value })}
-          className="w-full h-[60vh] outline-none resize-none text-slate-700 dark:text-slate-200 bg-transparent font-mono text-sm md:text-base leading-relaxed whitespace-pre-wrap break-words placeholder:text-slate-300 dark:placeholder:text-slate-600 transition-colors"
+        <RichTextToolbar editor={editor} />
+        <RichTextEditor
+          content={note.userNotes || ''}
+          onChange={(json) => onUpdate({ userNotes: json })}
           placeholder="Type your personal notes and observations here..."
+          onEditorReady={setEditor}
         />
       </div>
     </div>

@@ -11,6 +11,7 @@ export interface Note {
   summaryText: string;
   createdAt: number;
   isProcessing: boolean;
+  driveFileId?: string; // Google Drive file ID for saved files
 }
 
 export enum GeminiModel {
