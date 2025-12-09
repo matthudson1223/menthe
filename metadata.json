@@ -1,0 +1,8 @@
+{
+  "name": "notes",
+  "description": "Intelligent note-taker that transcribes handwritten notes and audio, providing verbatim copies and AI-powered summaries with editing capabilities.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

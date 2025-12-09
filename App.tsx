@@ -1,0 +1,957 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Camera, Mic, Plus, Search, Image as ImageIcon, FileText, ArrowLeft, Save, Share2, Wand2, PenLine, HardDrive, AlertCircle, Sparkles, BrainCircuit, StopCircle, MessageSquare, X, Send, ChevronRight, Maximize2, Minimize2, Trash2, Edit2, Check, Clock, Loader2, Download, File as FileIcon, Moon, Sun } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+// @ts-ignore
+import html2pdf from 'html2pdf.js';
+import { Note, ProcessingStatus } from './types';
+import * as geminiService from './services/geminiService';
+import { ProcessingOverlay } from './components/ProcessingOverlay';
+import { NoteCard } from './components/NoteCard';
+
+export default function App() {
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [activeNote, setActiveNote] = useState<Note | null>(null);
+  const [view, setView] = useState<'dashboard' | 'editor'>('dashboard');
+  const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>({ step: 'idle', message: '' });
+  
+  // Dark Mode State
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('theme');
+      if (saved) return saved === 'dark';
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+  });
+
+  // Chat State
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{role: 'user' | 'model', text: string}[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Recording State
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+
+  // Editor State
+  const [activeTab, setActiveTab] = useState<'notes' | 'transcript' | 'summary'>('notes');
+  const [refineInput, setRefineInput] = useState('');
+  const [isRefining, setIsRefining] = useState(false);
+  const [isFullWidth, setIsFullWidth] = useState(true);
+  const [isEditingSummary, setIsEditingSummary] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success'>('idle');
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  
+  // PDF Generation Ref
+  const pdfContentRef = useRef<HTMLDivElement>(null);
+
+  // Auto-title timer ref
+  const autoTitleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Dark Mode Effect
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [darkMode]);
+
+  // Load notes
+  useEffect(() => {
+    const saved = localStorage.getItem('notes');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Reset processing state on load to prevent stuck states
+        setNotes(parsed.map((n: Note) => ({...n, isProcessing: false})));
+      } catch (e) {
+        console.error("Failed to load notes", e);
+      }
+    }
+  }, []);
+
+  // Save notes
+  useEffect(() => {
+    localStorage.setItem('notes', JSON.stringify(notes));
+  }, [notes]);
+
+  // Scroll chat to bottom
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages, isChatOpen]);
+
+  // Auto-generate title logic
+  useEffect(() => {
+    // We can auto-title based on either transcript or user notes, whichever is more substantial
+    if (!activeNote) return;
+    
+    const content = activeNote.userNotes || activeNote.verbatimText || "";
+    if (!content) return;
+
+    // Only auto-title if it looks like a default title
+    const isDefaultTitle = activeNote.title === 'New Note' || activeNote.title === 'Untitled Note' || activeNote.title.trim() === '';
+    
+    if (isDefaultTitle && content.length > 50) {
+      if (autoTitleTimeoutRef.current) {
+        clearTimeout(autoTitleTimeoutRef.current);
+      }
+
+      autoTitleTimeoutRef.current = setTimeout(async () => {
+        try {
+          const newTitle = await geminiService.generateTitle(content);
+          updateNote(activeNote.id, { title: newTitle });
+        } catch (e) {
+          console.error("Auto-title failed", e);
+        }
+      }, 2000); // Wait for 2 seconds of inactivity
+    }
+
+    return () => {
+      if (autoTitleTimeoutRef.current) {
+        clearTimeout(autoTitleTimeoutRef.current);
+      }
+    };
+  }, [activeNote?.verbatimText, activeNote?.userNotes, activeNote?.id]);
+
+  const updateNote = (id: string, updates: Partial<Note>) => {
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, ...updates } : n));
+    if (activeNote?.id === id) {
+      setActiveNote(prev => prev ? { ...prev, ...updates } : null);
+    }
+  };
+
+  const createNote = (type: 'image' | 'audio' | 'text', initialData?: { url?: string, text?: string }) => {
+    const newNote: Note = {
+      id: crypto.randomUUID(),
+      title: 'New Note',
+      type,
+      originalMediaUrl: initialData?.url,
+      // If it's a text note creation, we treat initial text as user input (Notes).
+      // If it's media, we treat it as transcript (VerbatimText) usually populated later or via props.
+      verbatimText: '', 
+      userNotes: initialData?.text || '',
+      summaryText: '',
+      createdAt: Date.now(),
+      isProcessing: false,
+    };
+    setNotes(prev => [newNote, ...prev]);
+    setActiveNote(newNote);
+    setView('editor');
+    // Default tab: if text note, go to notes. If media, go to transcript.
+    setActiveTab(type === 'text' ? 'notes' : 'transcript');
+    setIsEditingSummary(false);
+    return newNote;
+  };
+
+  const deleteNote = (noteId: string) => {
+    // Use a small timeout to allow UI interactions (like ripple effects) to finish if needed
+    setTimeout(() => {
+      if (window.confirm("Are you sure you want to delete this note?")) {
+        setNotes(prev => prev.filter(n => n.id !== noteId));
+        
+        // Use the functional update of setActiveNote to safely check against the current state
+        setActiveNote(currentActive => {
+           if (currentActive && currentActive.id === noteId) {
+             setView('dashboard');
+             return null;
+           }
+           return currentActive;
+        });
+      }
+    }, 10);
+  };
+
+  const handleShare = async () => {
+    if (!activeNote) return;
+    
+    const textToShare = `${activeNote.title}\n\nSummary:\n${activeNote.summaryText || 'No summary'}\n\nNotes:\n${activeNote.userNotes || ''}\n\nTranscript:\n${activeNote.verbatimText}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: activeNote.title,
+          text: textToShare,
+        });
+      } catch (err) {
+        console.log("Share cancelled or failed", err);
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(textToShare);
+        alert("Note content copied to clipboard!");
+      } catch (err) {
+        console.error("Failed to copy", err);
+      }
+    }
+  };
+
+  const handleDownloadMarkdown = () => {
+    if (!activeNote) return;
+    setShowDownloadMenu(false);
+
+    const content = `# ${activeNote.title}
+Date: ${new Date(activeNote.createdAt).toLocaleString()}
+
+${activeNote.summaryText ? `## Summary\n${activeNote.summaryText}\n` : ''}
+${activeNote.userNotes ? `## User Notes\n${activeNote.userNotes}\n` : ''}
+${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`;
+
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${activeNote.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'note'}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!activeNote || !pdfContentRef.current) return;
+    setShowDownloadMenu(false);
+
+    const element = pdfContentRef.current;
+    const opt = {
+      margin: 10,
+      filename: `${activeNote.title.replace(/[^a-z0-9]/gi, '_') || 'note'}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    try {
+      await html2pdf().set(opt).from(element).save();
+    } catch (e) {
+      console.error("PDF generation failed", e);
+      alert("Failed to generate PDF. Please try again.");
+    }
+  };
+
+  const processNote = async (note: Note, base64Data: string, mimeType: string, type: 'image' | 'audio', initialTranscript?: string) => {
+    if (type === 'image') {
+        setProcessingStatus({ step: 'transcribing', message: 'Reading handwriting...' });
+    } else {
+        if (!initialTranscript) {
+             setProcessingStatus({ step: 'transcribing', message: 'Processing audio to text...' });
+        }
+    }
+    
+    try {
+      // 1. Transcribe (if not already transcribed live)
+      let verbatim = initialTranscript || '';
+      
+      if (!verbatim) {
+        if (type === 'image') {
+          verbatim = await geminiService.transcribeImage(base64Data, mimeType);
+        } else {
+          verbatim = await geminiService.transcribeAudio(base64Data, mimeType);
+        }
+      }
+
+      updateNote(note.id, { verbatimText: verbatim });
+
+      // 2. Summarize (including user notes if they exist, though usually empty at creation)
+      setProcessingStatus({ step: 'summarizing', message: 'Thinking deeply to summarize...' });
+      const summary = await geminiService.generateSummary(verbatim, note.userNotes);
+      updateNote(note.id, { summaryText: summary });
+
+      // 3. Title
+      setProcessingStatus({ step: 'titling', message: 'Giving it a name...' });
+      const title = await geminiService.generateTitle(verbatim.substring(0, 1000));
+      updateNote(note.id, { title });
+
+    } catch (error) {
+      console.error("Processing failed:", error);
+      alert("An error occurred while processing your note. Please try again.");
+    } finally {
+      setProcessingStatus({ step: 'idle', message: '' });
+    }
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Ensure we have an active note to attach to, or create one
+    let targetNote = activeNote;
+    if (!targetNote) {
+        targetNote = createNote('image');
+    } else if (targetNote.type !== 'image') {
+        updateNote(targetNote.id, { type: 'image' });
+    }
+
+    // Switch to transcript tab to see the result
+    setActiveTab('transcript');
+
+    const base64 = await geminiService.fileToBase64(file);
+    const mimeType = file.type;
+    const url = `data:${mimeType};base64,${base64}`;
+
+    updateNote(targetNote!.id, { originalMediaUrl: url });
+    processNote(targetNote!, base64, mimeType, 'image', targetNote!.verbatimText);
+  };
+
+  const startRecording = async () => {
+    try {
+      // Ensure we have an active note
+      let targetNoteId = activeNote?.id;
+      if (!targetNoteId) {
+          const newNote = createNote('audio');
+          targetNoteId = newNote.id;
+      } else {
+          updateNote(targetNoteId, { type: 'audio' });
+      }
+
+      // Switch to transcript tab to see recording status
+      setActiveTab('transcript');
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+             const base64Data = (reader.result as string).split(',')[1];
+             const url = URL.createObjectURL(audioBlob);
+             
+             const currentNote = notes.find(n => n.id === targetNoteId);
+             if (currentNote) {
+                 updateNote(targetNoteId!, { originalMediaUrl: url });
+                 // Pass empty string for initialTranscript to force backend processing
+                 processNote(currentNote, base64Data, 'audio/webm', 'audio', '');
+             }
+        }
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      // Start Recording
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      alert("Could not access microphone. Please check permissions.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      setIsRecording(false);
+      setMediaRecorder(null);
+    }
+  };
+
+  const handleRefineSummary = async () => {
+    if (!activeNote || !refineInput.trim()) return;
+    setIsRefining(true);
+    try {
+      const refined = await geminiService.refineSummary(activeNote.summaryText, refineInput);
+      updateNote(activeNote.id, { summaryText: refined });
+      setRefineInput('');
+      setIsEditingSummary(false); // Switch back to view mode to see result
+    } catch (error) {
+      console.error("Refinement failed", error);
+    } finally {
+      setIsRefining(false);
+    }
+  };
+
+  const handleGenerateSummary = async () => {
+    if (!activeNote) return;
+    if (!activeNote.verbatimText && !activeNote.userNotes) {
+        alert("Please add some notes or record audio to summarize.");
+        return;
+    }
+    
+    // Set background processing state
+    updateNote(activeNote.id, { isProcessing: true });
+    
+    try {
+        const promises: Promise<string>[] = [geminiService.generateSummary(activeNote.verbatimText, activeNote.userNotes)];
+        const isDefaultTitle = activeNote.title === 'New Note' || activeNote.title === 'Untitled Note';
+        
+        // Generate title if needed, using the most substantial content
+        const contentForTitle = (activeNote.userNotes || "") + "\n" + (activeNote.verbatimText || "");
+        if (isDefaultTitle && contentForTitle) {
+            promises.push(geminiService.generateTitle(contentForTitle.substring(0, 1000)));
+        }
+
+        const results = await Promise.all(promises);
+        const summary = results[0];
+        const title = results[1];
+
+        const updates: Partial<Note> = { summaryText: summary, isProcessing: false };
+        if (title) {
+            updates.title = title;
+        }
+
+        updateNote(activeNote.id, updates);
+        setIsEditingSummary(false); // Ensure we are in view mode to see the markdown
+    } catch (e) {
+        console.error(e);
+        alert("Failed to generate summary");
+        updateNote(activeNote.id, { isProcessing: false });
+    }
+  };
+
+  const handleChatSend = async () => {
+    if (!chatInput.trim()) return;
+    const userMsg = chatInput;
+    setChatMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+    setChatInput('');
+    setIsChatLoading(true);
+    
+    try {
+      const response = await geminiService.chatWithAI(userMsg);
+      setChatMessages(prev => [...prev, { role: 'model', text: response }]);
+    } catch (error) {
+      setChatMessages(prev => [...prev, { role: 'model', text: "Sorry, I encountered an error." }]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
+  const handlePublishToDrive = () => {
+    if (!activeNote) return;
+    
+    if (window.confirm(`Are you sure you want to save "${activeNote.title}" to Google Drive?`)) {
+      setSaveStatus('saving');
+      
+      // Simulate API interaction
+      setTimeout(() => {
+        setSaveStatus('success');
+        setTimeout(() => {
+          setSaveStatus('idle');
+        }, 2000);
+      }, 1500);
+    }
+  };
+
+  // Render Functions
+  const renderDashboard = () => (
+    <div className="max-w-3xl mx-auto p-4 md:p-6 pb-32">
+      <header className="mb-8 flex justify-between items-center sticky top-0 bg-slate-50 dark:bg-slate-950 z-10 py-4 transition-colors">
+        <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <BrainCircuit className="text-blue-600 dark:text-blue-500" /> NoteGenius
+            </h1>
+            <p className="text-slate-500 dark:text-slate-400 mt-1">My Notes</p>
+        </div>
+        <button 
+          onClick={() => setDarkMode(!darkMode)}
+          className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+        >
+          {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+        </button>
+      </header>
+
+      <div className="space-y-4">
+        <div className="relative mb-6">
+           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+           <input 
+              type="text" 
+              placeholder="Search notes..." 
+              className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-colors"
+           />
+        </div>
+
+        {notes.length === 0 ? (
+            <div className="text-center py-24 px-4 bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 transition-colors">
+                <div className="mx-auto w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 text-slate-300 dark:text-slate-600">
+                    <FileText size={32} />
+                </div>
+                <p className="text-slate-500 dark:text-slate-400 mb-2">No notes yet.</p>
+                <p className="text-sm text-slate-400 dark:text-slate-500">Tap the + button to create your first note.</p>
+            </div>
+        ) : (
+            notes.map(note => (
+              <NoteCard 
+                key={note.id} 
+                note={note} 
+                onClick={(n) => { 
+                    setActiveNote(n); 
+                    setView('editor'); 
+                    // Default logic when opening: notes tab first
+                    setActiveTab('notes'); 
+                    setIsEditingSummary(false); 
+                }} 
+                onDelete={deleteNote}
+              />
+            ))
+        )}
+      </div>
+
+      {/* Floating Action Button */}
+      <button 
+        onClick={() => createNote('text')}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-xl flex items-center justify-center hover:bg-blue-700 hover:scale-105 transition-all z-20"
+      >
+        <Plus size={28} />
+      </button>
+    </div>
+  );
+
+  const renderEditor = () => {
+    if (!activeNote) return null;
+    return (
+      <div className="h-screen flex flex-col bg-white dark:bg-slate-950 transition-colors">
+        {/* Editor Toolbar */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 sticky top-0 z-10 transition-colors">
+          <div className="flex items-center gap-2">
+            <button onClick={() => setView('dashboard')} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-600 dark:text-slate-400 transition-colors">
+                <ArrowLeft size={20} />
+            </button>
+            
+            {/* AI Action Buttons moved to Toolbar */}
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-full p-1 ml-2 transition-colors">
+                <label className="p-2 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-700 rounded-full transition-colors cursor-pointer" title="Scan Image">
+                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                    <ImageIcon size={18} />
+                </label>
+                <button 
+                    onClick={isRecording ? stopRecording : startRecording} 
+                    className={`p-2 rounded-full transition-colors ${isRecording ? 'text-red-600 bg-red-100 dark:bg-red-900/30 animate-pulse' : 'text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-white dark:hover:bg-slate-700'}`}
+                    title={isRecording ? "Stop Recording" : "Start Recording"}
+                >
+                    {isRecording ? <StopCircle size={18} /> : <Mic size={18} />}
+                </button>
+                <button 
+                    onClick={() => setIsChatOpen(true)} 
+                    className="p-2 text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-white dark:hover:bg-slate-700 rounded-full transition-colors"
+                    title="Ask AI"
+                >
+                    <MessageSquare size={18} />
+                </button>
+            </div>
+            
+            {/* Dark Mode Toggle in Editor */}
+            <button 
+              onClick={() => setDarkMode(!darkMode)}
+              className="ml-2 p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors hidden sm:block"
+            >
+              {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+          </div>
+
+          <div className="flex gap-2 relative">
+            <button onClick={() => setIsFullWidth(!isFullWidth)} className="hidden md:flex items-center gap-2 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-sm transition-colors" title="Fit to screen">
+                {isFullWidth ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
+            <button 
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteNote(activeNote.id);
+                }} 
+                className="p-2 text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors" 
+                title="Delete Note"
+            >
+               <Trash2 size={20} />
+            </button>
+
+             {/* Download Dropdown */}
+            <div className="relative">
+              <button 
+                onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                className="p-2 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors"
+                title="Download"
+              >
+                <Download size={20} />
+              </button>
+              {showDownloadMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowDownloadMenu(false)}></div>
+                  <div className="absolute top-full right-0 mt-2 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-2 min-w-[160px] z-20 flex flex-col">
+                     <button onClick={handleDownloadMarkdown} className="px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors">
+                       <FileText size={16} className="text-slate-400" /> Markdown (.md)
+                     </button>
+                     <button onClick={handleDownloadPDF} className="px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors">
+                       <FileIcon size={16} className="text-slate-400" /> PDF (.pdf)
+                     </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <button 
+              id="drive-btn" 
+              onClick={handlePublishToDrive} 
+              disabled={saveStatus !== 'idle'}
+              className={`flex items-center gap-2 px-3 py-2 md:px-4 border rounded-full text-sm font-medium transition-all ${
+                saveStatus === 'success' 
+                  ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400' 
+                  : saveStatus === 'saving'
+                    ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
+              }`}
+            >
+              {saveStatus === 'saving' ? (
+                <Loader2 className="animate-spin" size={16} />
+              ) : saveStatus === 'success' ? (
+                <Check size={16} />
+              ) : (
+                <HardDrive size={16} />
+              )}
+              <span className="hidden sm:inline">
+                {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'success' ? 'Saved' : 'Save'}
+              </span>
+            </button>
+            <button onClick={handleShare} className="p-2 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors">
+               <Share2 size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Title Area */}
+        <div className={`px-4 md:px-6 pt-6 pb-2 mx-auto ${isFullWidth ? 'w-full md:px-8' : 'max-w-3xl'}`}>
+            <input 
+                value={activeNote.title}
+                onChange={(e) => updateNote(activeNote.id, { title: e.target.value })}
+                className="text-2xl font-bold w-full outline-none text-slate-800 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 bg-transparent transition-colors"
+                placeholder="Untitled Note"
+            />
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 flex items-center gap-1">
+                <Clock size={12} />
+                {new Date(activeNote.createdAt).toLocaleString()}
+            </p>
+        </div>
+
+        {/* Content Tabs & Actions */}
+        <div className={`flex flex-wrap items-end justify-between border-b border-slate-100 dark:border-slate-800 px-4 md:px-6 mt-4 mx-auto gap-4 ${isFullWidth ? 'w-full md:px-8' : 'max-w-3xl'} transition-colors`}>
+            <div className="flex gap-6 overflow-x-auto no-scrollbar">
+                <button 
+                    onClick={() => setActiveTab('notes')}
+                    className={`pb-3 px-2 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === 'notes' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                >
+                    Notes
+                    {activeTab === 'notes' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 dark:bg-blue-500 rounded-t-full"></div>}
+                </button>
+                <button 
+                    onClick={() => setActiveTab('transcript')}
+                    className={`pb-3 px-2 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === 'transcript' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                >
+                    Transcript
+                    {activeTab === 'transcript' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 dark:bg-blue-500 rounded-t-full"></div>}
+                </button>
+                <button 
+                    onClick={() => setActiveTab('summary')}
+                    className={`pb-3 px-2 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === 'summary' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                >
+                    Summary
+                    {activeTab === 'summary' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 dark:bg-blue-500 rounded-t-full"></div>}
+                </button>
+            </div>
+            
+            {/* Generate Summary Button */}
+            <button 
+                onClick={handleGenerateSummary}
+                disabled={activeNote.isProcessing}
+                className={`mb-2 px-3 py-2 md:px-4 border rounded-lg text-sm font-medium transition-all shadow-sm flex items-center gap-2 ${
+                    activeNote.isProcessing 
+                    ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-400 dark:text-blue-300 cursor-not-allowed' 
+                    : 'bg-white dark:bg-slate-800 border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-300 active:scale-95'
+                }`}
+            >
+                {activeNote.isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                <span className="hidden sm:inline">{activeNote.isProcessing ? 'Generating...' : 'Generate Summary'}</span>
+            </button>
+        </div>
+
+        {/* Editor Content */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/50 dark:bg-slate-900/50 pb-20 transition-colors">
+            
+            {/* NOTES TAB: Manual User Input */}
+            {activeTab === 'notes' && (
+                <div className={`mx-auto transition-all duration-300 ${isFullWidth ? 'w-full md:px-4' : 'max-w-2xl'}`}>
+                    <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 min-h-[50vh] transition-colors">
+                        <textarea 
+                            value={activeNote.userNotes || ''}
+                            onChange={(e) => updateNote(activeNote.id, { userNotes: e.target.value })}
+                            className="w-full h-[60vh] outline-none resize-none text-slate-700 dark:text-slate-200 bg-transparent font-mono text-sm md:text-base leading-relaxed whitespace-pre-wrap break-words placeholder:text-slate-300 dark:placeholder:text-slate-600 transition-colors"
+                            placeholder="Type your personal notes and observations here..."
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* TRANSCRIPT TAB: AI generated from Media */}
+            {activeTab === 'transcript' && (
+                <div className={`mx-auto transition-all duration-300 ${isFullWidth ? 'w-full md:px-4' : 'max-w-2xl'}`}>
+                    <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 min-h-[50vh] transition-colors">
+                        
+                        {/* Media Player Section within Transcript Tab */}
+                        {activeNote.originalMediaUrl ? (
+                            <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-700 flex flex-col items-center justify-center transition-colors">
+                                {activeNote.type === 'image' && (
+                                    <img src={activeNote.originalMediaUrl} alt="Original" className="max-h-64 rounded shadow-sm" />
+                                )}
+                                {activeNote.type === 'audio' && (
+                                    <div className="w-full">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full">
+                                                <Mic size={20} />
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Audio Recording Attached</span>
+                                                <span className="text-xs text-slate-400">Processing happens in the background. Playback disabled.</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                             // Empty State for Transcript when no media
+                            <div className="mb-6 p-6 bg-slate-50 dark:bg-slate-900 rounded-lg border border-dashed border-slate-200 dark:border-slate-700 text-center transition-colors">
+                                <p className="text-slate-400 text-sm">No media attached. Upload an image or record audio to generate a transcript.</p>
+                            </div>
+                        )}
+
+                        <div className="flex justify-between items-center mb-4 border-b border-slate-50 dark:border-slate-700 pb-2 transition-colors">
+                             <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                <FileText size={12} />
+                                Verbatim Transcript
+                             </div>
+                             {isRecording && (
+                                 <span className="text-xs font-bold text-red-500 animate-pulse flex items-center gap-1">
+                                     <div className="w-2 h-2 bg-red-500 rounded-full"></div> Recording in progress...
+                                 </span>
+                             )}
+                        </div>
+                        
+                        <textarea 
+                            value={activeNote.verbatimText || ''}
+                            onChange={(e) => updateNote(activeNote.id, { verbatimText: e.target.value })}
+                            className="w-full h-[60vh] outline-none resize-none text-slate-700 dark:text-slate-200 bg-transparent font-mono text-sm md:text-base leading-relaxed whitespace-pre-wrap break-words placeholder:text-slate-300 dark:placeholder:text-slate-600 transition-colors"
+                            placeholder="Transcript from audio or image will appear here after processing..."
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* SUMMARY TAB: AI Generated Summary */}
+            {activeTab === 'summary' && (
+                <div className={`mx-auto space-y-6 transition-all duration-300 ${isFullWidth ? 'w-full md:px-4' : 'max-w-2xl'}`}>
+                    <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 min-h-[400px] relative group transition-colors">
+                         {/* Toggle Edit Button */}
+                         {activeNote.summaryText && (
+                            <button 
+                                onClick={() => setIsEditingSummary(!isEditingSummary)}
+                                className="absolute top-4 right-4 p-2 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors opacity-0 group-hover:opacity-100 z-10"
+                                title={isEditingSummary ? "Done Editing" : "Edit Summary"}
+                            >
+                                {isEditingSummary ? <Check size={18} /> : <Edit2 size={18} />}
+                            </button>
+                        )}
+
+                        {activeNote.summaryText ? (
+                            isEditingSummary ? (
+                                <textarea 
+                                    value={activeNote.summaryText}
+                                    onChange={(e) => updateNote(activeNote.id, { summaryText: e.target.value })}
+                                    className="w-full h-full min-h-[400px] outline-none resize-none text-slate-700 dark:text-slate-200 bg-transparent leading-relaxed whitespace-pre-wrap break-words text-sm md:text-base font-mono"
+                                    autoFocus
+                                />
+                            ) : (
+                                <div className="markdown-preview">
+                                    <ReactMarkdown>{activeNote.summaryText}</ReactMarkdown>
+                                </div>
+                            )
+                        ) : (
+                            <div className="h-[400px] flex flex-col items-center justify-center">
+                                {/* Enhanced Loading State - or Empty State */}
+                                {activeNote.isProcessing ? (
+                                    <div className="w-64 h-80 rounded-lg border-2 border-dashed border-blue-300 dark:border-blue-700 flex flex-col items-center justify-center bg-blue-50/30 dark:bg-blue-900/10 transition-colors">
+                                        <Sparkles size={48} className="mb-4 text-blue-400 animate-pulse" />
+                                        <p className="text-slate-400 dark:text-slate-500 text-sm font-medium text-center px-4">Generating summary in background...</p>
+                                    </div>
+                                ) : processingStatus.step === 'summarizing' ? (
+                                    <div className="w-64 h-80 rounded-lg border-2 border-dashed border-blue-300 dark:border-blue-700 flex flex-col items-center justify-center bg-blue-50/30 dark:bg-blue-900/10 transition-colors">
+                                        <Sparkles size={48} className="mb-4 text-blue-400 animate-pulse" />
+                                        <p className="text-slate-400 dark:text-slate-500 text-sm font-medium">Waiting for AI summary...</p>
+                                    </div>
+                                ) : (
+                                    <div className="w-64 h-80 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center bg-slate-50/30 dark:bg-slate-900/30 transition-colors">
+                                        <BrainCircuit size={48} className="mb-4 text-slate-300 dark:text-slate-600" />
+                                        <p className="text-slate-400 dark:text-slate-500 text-sm font-medium text-center px-4">No summary yet.<br/>Click "Generate Summary" to create one.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Refinement Box */}
+                    {activeNote.summaryText && (
+                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30 shadow-sm transition-colors">
+                            <label className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-2 block flex items-center gap-1">
+                                <Wand2 size={12} /> Refine with AI
+                            </label>
+                            <div className="flex gap-2">
+                                <input 
+                                    value={refineInput}
+                                    onChange={(e) => setRefineInput(e.target.value)}
+                                    placeholder="Make it shorter..."
+                                    className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 dark:focus:border-blue-500 text-slate-700 dark:text-slate-200 transition-colors"
+                                    onKeyDown={(e) => e.key === 'Enter' && handleRefineSummary()}
+                                />
+                                <button 
+                                    onClick={handleRefineSummary}
+                                    disabled={isRefining || !refineInput.trim()}
+                                    className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                                >
+                                    {isRefining ? <Sparkles className="animate-spin" size={18} /> : <ArrowLeft className="rotate-180" size={18} />}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className={`min-h-screen bg-slate-50 dark:bg-slate-950 relative font-sans text-slate-900 dark:text-slate-100 transition-colors duration-200`}>
+      <ProcessingOverlay status={processingStatus} />
+      
+      {/* Background Recording Status Bar */}
+      {isRecording && (
+        <div className="fixed bottom-0 left-0 right-0 bg-slate-900 dark:bg-black text-white p-3 z-50 flex items-center justify-between shadow-lg animate-in slide-in-from-bottom-5 border-t border-slate-800">
+           <div className="flex items-center gap-3 px-2">
+               <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+               <div className="flex flex-col">
+                   <span className="text-sm font-semibold">Recording in progress</span>
+                   <span className="text-xs text-slate-400">Processing will begin when you stop...</span>
+               </div>
+           </div>
+           <button 
+              onClick={stopRecording}
+              className="px-4 py-2 bg-white text-slate-900 rounded-full text-xs font-bold hover:bg-red-500 hover:text-white transition-colors"
+           >
+              Stop & Save
+           </button>
+        </div>
+      )}
+
+      {view === 'dashboard' ? renderDashboard() : renderEditor()}
+
+      {/* Hidden PDF Generation Template - Forces light mode styles for print */}
+      <div style={{ position: 'fixed', top: '-10000px', left: '-10000px', width: '210mm', minHeight: '297mm', background: 'white', padding: '20mm' }} ref={pdfContentRef}>
+        {activeNote && (
+            <div className="text-slate-900 font-sans">
+                <h1 className="text-3xl font-bold mb-2 text-slate-900">{activeNote.title}</h1>
+                <p className="text-sm text-slate-500 mb-8 pb-4 border-b border-slate-100">{new Date(activeNote.createdAt).toLocaleString()}</p>
+                
+                {activeNote.type === 'image' && activeNote.originalMediaUrl && (
+                    <div className="mb-8 flex justify-center bg-slate-50 p-4 rounded-lg">
+                        <img src={activeNote.originalMediaUrl} alt="Note Attachment" style={{maxWidth: '100%', maxHeight: '400px'}} />
+                    </div>
+                )}
+
+                {activeNote.summaryText && (
+                    <div className="mb-8">
+                    <h2 className="text-xl font-bold border-b border-slate-200 pb-2 mb-4 text-blue-900">Summary</h2>
+                    <div className="markdown-preview text-sm leading-relaxed text-slate-800">
+                        <ReactMarkdown>{activeNote.summaryText}</ReactMarkdown>
+                    </div>
+                    </div>
+                )}
+
+                {activeNote.userNotes && (
+                    <div className="mb-8">
+                    <h2 className="text-xl font-bold border-b border-slate-200 pb-2 mb-4 text-blue-900">User Notes</h2>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap font-mono bg-slate-50 p-4 rounded border border-slate-100 text-slate-700">{activeNote.userNotes}</p>
+                    </div>
+                )}
+
+                {activeNote.verbatimText && (
+                    <div className="mb-8">
+                    <h2 className="text-xl font-bold border-b border-slate-200 pb-2 mb-4 text-blue-900">Transcript</h2>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap text-slate-600 font-serif">{activeNote.verbatimText}</p>
+                    </div>
+                )}
+            </div>
+        )}
+      </div>
+
+      {/* Chat Bot Overlay */}
+      {isChatOpen && (
+        <div className="fixed inset-0 md:inset-auto md:bottom-20 md:right-6 md:w-96 md:h-[500px] bg-white dark:bg-slate-900 md:rounded-2xl shadow-2xl z-40 flex flex-col border border-slate-200 dark:border-slate-800 animate-in slide-in-from-bottom-10 fade-in duration-300 transition-colors">
+            <div className="p-4 bg-gradient-to-r from-blue-600 to-purple-600 md:rounded-t-2xl flex justify-between items-center text-white shadow-md">
+                <div className="flex items-center gap-2">
+                    <Sparkles size={18} />
+                    <span className="font-semibold">Gemini Assistant</span>
+                </div>
+                <button onClick={() => setIsChatOpen(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors">
+                    <X size={20} />
+                </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 dark:bg-slate-950 transition-colors">
+                {chatMessages.length === 0 && (
+                    <div className="text-center text-slate-400 dark:text-slate-500 mt-10">
+                        <Sparkles className="mx-auto mb-2 opacity-50" size={32} />
+                        <p className="text-sm">Ask me anything about your notes or general questions!</p>
+                    </div>
+                )}
+                {chatMessages.map((msg, idx) => (
+                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
+                            msg.role === 'user' 
+                                ? 'bg-blue-600 text-white rounded-br-none' 
+                                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-bl-none'
+                        }`}>
+                            {msg.text}
+                        </div>
+                    </div>
+                ))}
+                {isChatLoading && (
+                    <div className="flex justify-start">
+                         <div className="bg-white dark:bg-slate-800 px-4 py-3 rounded-2xl rounded-bl-none border border-slate-200 dark:border-slate-700 shadow-sm flex gap-1">
+                            <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
+                            <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-75"></div>
+                            <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-150"></div>
+                        </div>
+                    </div>
+                )}
+                <div ref={chatEndRef} />
+            </div>
+
+            <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 md:rounded-b-2xl transition-colors">
+                <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-full px-4 py-2 focus-within:ring-2 focus-within:ring-blue-100 dark:focus-within:ring-blue-900/50 transition-all">
+                    <input 
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleChatSend()}
+                        placeholder="Type a message..."
+                        className="flex-1 bg-transparent outline-none text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
+                    />
+                    <button 
+                        onClick={handleChatSend} 
+                        disabled={!chatInput.trim() || isChatLoading}
+                        className="text-blue-600 dark:text-blue-400 hover:scale-110 transition-transform disabled:opacity-50"
+                    >
+                        <Send size={18} />
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+    </div>
+  );
+}
