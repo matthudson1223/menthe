@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Mic, Plus, Search, Image as ImageIcon, FileText, ArrowLeft, Save, Share2, Wand2, PenLine, HardDrive, AlertCircle, Sparkles, BrainCircuit, StopCircle, MessageSquare, X, Send, ChevronRight, Maximize2, Minimize2, Trash2, Edit2, Check, Clock, Loader2, Download, File as FileIcon, Moon, Sun } from 'lucide-react';
+import { Camera, Mic, Plus, Search, Image as ImageIcon, FileText, ArrowLeft, Save, Share2, Wand2, PenLine, HardDrive, AlertCircle, Sparkles, BrainCircuit, Zap, StopCircle, MessageSquare, X, Send, ChevronRight, Maximize2, Minimize2, Trash2, Edit2, Check, Clock, Loader2, Download, File as FileIcon, Moon, Sun, Paperclip, FileAudio } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
@@ -36,7 +36,7 @@ export default function App() {
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
 
   // Editor State
-  const [activeTab, setActiveTab] = useState<'notes' | 'transcript' | 'summary'>('notes');
+  const [activeTab, setActiveTab] = useState<'notes' | 'files' | 'transcript' | 'summary'>('notes');
   const [refineInput, setRefineInput] = useState('');
   const [isRefining, setIsRefining] = useState(false);
   const [isFullWidth, setIsFullWidth] = useState(true);
@@ -220,9 +220,9 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
     const opt = {
       margin: 10,
       filename: `${activeNote.title.replace(/[^a-z0-9]/gi, '_') || 'note'}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
+      image: { type: 'jpeg' as const, quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
     };
 
     try {
@@ -234,14 +234,9 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
   };
 
   const processNote = async (note: Note, base64Data: string, mimeType: string, type: 'image' | 'audio', initialTranscript?: string) => {
-    if (type === 'image') {
-        setProcessingStatus({ step: 'transcribing', message: 'Reading handwriting...' });
-    } else {
-        if (!initialTranscript) {
-             setProcessingStatus({ step: 'transcribing', message: 'Processing audio to text...' });
-        }
-    }
-    
+    // Set note to processing state (background)
+    updateNote(note.id, { isProcessing: true });
+
     try {
       // 1. Transcribe (if not already transcribed live)
       let verbatim = initialTranscript || '';
@@ -257,12 +252,10 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
       updateNote(note.id, { verbatimText: verbatim });
 
       // 2. Summarize (including user notes if they exist, though usually empty at creation)
-      setProcessingStatus({ step: 'summarizing', message: 'Thinking deeply to summarize...' });
       const summary = await geminiService.generateSummary(verbatim, note.userNotes);
       updateNote(note.id, { summaryText: summary });
 
       // 3. Title
-      setProcessingStatus({ step: 'titling', message: 'Giving it a name...' });
       const title = await geminiService.generateTitle(verbatim.substring(0, 1000));
       updateNote(note.id, { title });
 
@@ -270,7 +263,8 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
       console.error("Processing failed:", error);
       alert("An error occurred while processing your note. Please try again.");
     } finally {
-      setProcessingStatus({ step: 'idle', message: '' });
+      // Clear processing state
+      updateNote(note.id, { isProcessing: false });
     }
   };
 
@@ -286,8 +280,8 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
         updateNote(targetNote.id, { type: 'image' });
     }
 
-    // Switch to transcript tab to see the result
-    setActiveTab('transcript');
+    // Switch to files tab to see the upload
+    setActiveTab('files');
 
     const base64 = await geminiService.fileToBase64(file);
     const mimeType = file.type;
@@ -308,7 +302,7 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
           updateNote(targetNoteId, { type: 'audio' });
       }
 
-      // Switch to transcript tab to see recording status
+      // Switch to transcript tab so they can see when text appears later
       setActiveTab('transcript');
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -324,12 +318,13 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = () => {
-             const base64Data = (reader.result as string).split(',')[1];
-             const url = URL.createObjectURL(audioBlob);
+             // Convert to Data URL for persistence and playback (if we allowed it)
+             const dataUrl = reader.result as string; 
+             const base64Data = dataUrl.split(',')[1];
              
              const currentNote = notes.find(n => n.id === targetNoteId);
              if (currentNote) {
-                 updateNote(targetNoteId!, { originalMediaUrl: url });
+                 updateNote(targetNoteId!, { originalMediaUrl: dataUrl });
                  // Pass empty string for initialTranscript to force backend processing
                  processNote(currentNote, base64Data, 'audio/webm', 'audio', '');
              }
@@ -642,6 +637,13 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
                     {activeTab === 'notes' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 dark:bg-blue-500 rounded-t-full"></div>}
                 </button>
                 <button 
+                    onClick={() => setActiveTab('files')}
+                    className={`pb-3 px-2 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === 'files' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                >
+                    Files
+                    {activeTab === 'files' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 dark:bg-blue-500 rounded-t-full"></div>}
+                </button>
+                <button 
                     onClick={() => setActiveTab('transcript')}
                     className={`pb-3 px-2 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === 'transcript' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
                 >
@@ -689,56 +691,62 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
                 </div>
             )}
 
-            {/* TRANSCRIPT TAB: AI generated from Media */}
-            {activeTab === 'transcript' && (
+            {/* FILES TAB: Uploaded Media */}
+            {activeTab === 'files' && (
                 <div className={`mx-auto transition-all duration-300 ${isFullWidth ? 'w-full md:px-4' : 'max-w-2xl'}`}>
                     <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 min-h-[50vh] transition-colors">
-                        
-                        {/* Media Player Section within Transcript Tab */}
                         {activeNote.originalMediaUrl ? (
-                            <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-700 flex flex-col items-center justify-center transition-colors">
+                            <div className="flex flex-col gap-4">
+                                <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                    <Paperclip size={14} /> Attached Media
+                                </h3>
                                 {activeNote.type === 'image' && (
-                                    <img src={activeNote.originalMediaUrl} alt="Original" className="max-h-64 rounded shadow-sm" />
+                                    <div className="p-2 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-700">
+                                        <img src={activeNote.originalMediaUrl} alt="Attached File" className="w-full rounded-lg shadow-sm" />
+                                    </div>
                                 )}
                                 {activeNote.type === 'audio' && (
-                                    <div className="w-full">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full">
-                                                <Mic size={20} />
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Audio Recording Attached</span>
-                                                <span className="text-xs text-slate-400">Processing happens in the background. Playback disabled.</span>
-                                            </div>
+                                    <div className="p-6 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-700 flex items-center gap-4">
+                                        <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full">
+                                            <FileAudio size={24} />
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-slate-700 dark:text-slate-200">Voice Recording</p>
+                                            <p className="text-sm text-slate-500 dark:text-slate-400">Attached • Playback Disabled</p>
                                         </div>
                                     </div>
                                 )}
                             </div>
                         ) : (
-                             // Empty State for Transcript when no media
-                            <div className="mb-6 p-6 bg-slate-50 dark:bg-slate-900 rounded-lg border border-dashed border-slate-200 dark:border-slate-700 text-center transition-colors">
-                                <p className="text-slate-400 text-sm">No media attached. Upload an image or record audio to generate a transcript.</p>
+                            <div className="flex flex-col items-center justify-center h-64 text-slate-400 dark:text-slate-500">
+                                <Paperclip size={48} className="mb-4 opacity-50" />
+                                <p>No files attached to this note.</p>
+                                <p className="text-sm mt-2">Use the toolbar to attach images or record audio.</p>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
 
-                        <div className="flex justify-between items-center mb-4 border-b border-slate-50 dark:border-slate-700 pb-2 transition-colors">
-                             <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                <FileText size={12} />
-                                Verbatim Transcript
-                             </div>
-                             {isRecording && (
-                                 <span className="text-xs font-bold text-red-500 animate-pulse flex items-center gap-1">
-                                     <div className="w-2 h-2 bg-red-500 rounded-full"></div> Recording in progress...
-                                 </span>
-                             )}
-                        </div>
-                        
+            {/* TRANSCRIPT TAB: AI generated from Media */}
+            {activeTab === 'transcript' && (
+                <div className={`mx-auto transition-all duration-300 ${isFullWidth ? 'w-full md:px-4' : 'max-w-2xl'}`}>
+                    <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 min-h-[50vh] transition-colors relative">
                         <textarea 
                             value={activeNote.verbatimText || ''}
                             onChange={(e) => updateNote(activeNote.id, { verbatimText: e.target.value })}
                             className="w-full h-[60vh] outline-none resize-none text-slate-700 dark:text-slate-200 bg-transparent font-mono text-sm md:text-base leading-relaxed whitespace-pre-wrap break-words placeholder:text-slate-300 dark:placeholder:text-slate-600 transition-colors"
-                            placeholder="Transcript from audio or image will appear here after processing..."
+                            placeholder={activeNote.isProcessing ? "" : "Transcript will appear here..."}
                         />
+                        {/* Inline Loading State for Transcript */}
+                        {activeNote.isProcessing && !activeNote.verbatimText && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div className="bg-white/90 dark:bg-slate-800/90 px-6 py-3 rounded-full shadow-lg border border-slate-100 dark:border-slate-700 flex items-center gap-3 backdrop-blur-sm">
+                                    <Loader2 className="animate-spin text-blue-500" size={20}/> 
+                                    <span className="text-slate-600 dark:text-slate-300 font-medium">Processing transcript...</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
