@@ -443,7 +443,7 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
       <header className="mb-8 flex justify-between items-center sticky top-0 bg-slate-50 dark:bg-slate-950 z-10 py-4 transition-colors">
         <div>
             <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <BrainCircuit className="text-blue-600 dark:text-blue-500" /> NoteGenius
+                <BrainCircuit className="text-blue-600 dark:text-blue-500" /> Menthe
             </h1>
             <p className="text-slate-500 dark:text-slate-400 mt-1">My Notes</p>
         </div>

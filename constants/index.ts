@@ -7,7 +7,7 @@ export const STORAGE_KEYS = {
 
 // App Configuration
 export const APP_CONFIG = {
-  APP_NAME: 'NoteGenius',
+  APP_NAME: 'Menthe',
   AUTO_TITLE_DELAY: 2000, // ms
   AUTO_SAVE_DEBOUNCE: 1000, // ms
   PDF_GENERATION_OPTIONS: {

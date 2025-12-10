@@ -1,7 +1,7 @@
-# NoteGenius AI - Refactoring Summary
+# Menthe AI - Refactoring Summary
 
 ## Overview
-This document summarizes the comprehensive refactoring of the NoteGenius AI application to improve maintainability, performance, code quality, and accessibility.
+This document summarizes the comprehensive refactoring of the Menthe AI application to improve maintainability, performance, code quality, and accessibility.
 
 ## Key Improvements
 
