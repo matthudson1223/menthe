@@ -1,6 +1,6 @@
 substitutions:
   _SERVICE_NAME: menthe-web
-  _REGION: us-central1
+  _REGION: asia-southeast1
   _IMAGE: gcr.io/$PROJECT_ID/menthe-web:$COMMIT_SHA
 
 steps:
