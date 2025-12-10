@@ -156,6 +156,40 @@ export const refineSummary = async (currentSummary: string, instruction: string)
   }
 };
 
+export const generateTags = async (summary: string, title: string = ""): Promise<string[]> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: GeminiModel.FLASH,
+      contents: {
+        parts: [{
+          text: `Extract 3-5 relevant tags from the following note. Tags should be single words or short phrases (1-2 words max), lowercase, and separated by commas. Be specific and meaningful.
+
+          Title: ${title || "No title"}
+
+          Content:
+          ${summary.substring(0, 1000)}
+
+          Return ONLY the tags as a comma-separated list, nothing else. Example: project planning, ai tools, productivity`
+        }],
+      },
+    });
+
+    const tagsText = response.text?.trim() || "";
+    if (!tagsText) return [];
+
+    const tags = tagsText
+      .split(',')
+      .map(tag => tag.trim().toLowerCase())
+      .filter(tag => tag.length > 0)
+      .slice(0, 10); // Limit to 10 tags
+
+    return tags;
+  } catch (error) {
+    console.error("Tag generation error:", error);
+    return [];
+  }
+};
+
 export const chatWithAI = async (message: string): Promise<string> => {
   try {
     const response = await ai.models.generateContent({

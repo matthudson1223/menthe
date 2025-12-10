@@ -94,7 +94,7 @@ export function useNoteProcessing(
     try {
       const combinedTranscript = buildCombinedTranscript(note);
 
-      const promises: Promise<string>[] = [
+      const promises: Promise<any>[] = [
         retryWithBackoff(() =>
           geminiService.generateSummary(combinedTranscript, note.userNotes)
         )
@@ -116,8 +116,15 @@ export function useNoteProcessing(
       const summary = results[0];
       const title = results[1];
 
+      // Generate tags from the summary
+      setProcessingStatus({ step: 'titling', message: 'Generating tags...' });
+      const tags = await retryWithBackoff(() =>
+        geminiService.generateTags(summary, title || note.title)
+      );
+
       const updates: Partial<Note> = {
         summaryText: summary,
+        tags: tags.length > 0 ? tags : note.tags || [],
         isProcessing: false
       };
 
@@ -125,6 +132,7 @@ export function useNoteProcessing(
         updates.title = title;
       }
 
+      setProcessingStatus({ step: 'idle', message: '' });
       updateNote(note.id, updates);
     } catch (error) {
       console.error('Summary generation failed:', error);
