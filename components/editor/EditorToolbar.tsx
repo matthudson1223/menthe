@@ -59,7 +59,7 @@ export const EditorToolbar = React.memo<EditorToolbarProps>(({
   driveError,
   onClearDriveError,
 }) => {
-  const { notes, chat, recording, theme } = useNotesContext();
+  const { notes, chat, recording, theme, processing } = useNotesContext();
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDriveSuccess, setShowDriveSuccess] = useState(false);
@@ -293,6 +293,13 @@ export const EditorToolbar = React.memo<EditorToolbarProps>(({
         >
           <Share2 size={20} />
         </button>
+
+        {processing.processingStatus.step === 'transcribing' && (
+          <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-xs font-medium text-blue-700 dark:text-blue-300">
+            <Loader2 className="animate-spin" size={14} />
+            <span>Transcribing audio in background…</span>
+          </div>
+        )}
       </div>
 
         {/* Delete Confirmation Modal */}

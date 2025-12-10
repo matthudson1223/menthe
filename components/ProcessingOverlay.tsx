@@ -7,7 +7,8 @@ interface Props {
 }
 
 export const ProcessingOverlay: React.FC<Props> = ({ status }) => {
-  if (status.step === 'idle') return null;
+  // Don't block the UI during long-running transcriptions; rely on inline indicators instead.
+  if (status.step === 'idle' || status.step === 'transcribing') return null;
 
   const getIcon = () => {
     switch (status.step) {
