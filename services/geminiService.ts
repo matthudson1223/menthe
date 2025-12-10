@@ -81,7 +81,7 @@ export const generateSummary = async (transcript: string, userNotes: string = ""
     // Using Pro with Thinking for deep analysis
     const prompt = `Analyze the following content and provide a comprehensive summary.
     
-    The content consists of a verbatim transcript (from audio or image) and user-written notes. Combine insights from both sources.
+    The content consists of a transcript (from audio or image) and user-written notes. Combine insights from both sources.
     
     TRANSCRIPT:
     ${transcript || "(No transcript provided)"}

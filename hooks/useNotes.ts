@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
+import { collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { Note, NoteType, UseNotesReturn } from '../types';
-import { storageService } from '../services/storageService';
 import { DEFAULTS } from '../constants';
+import { db } from '../services/firebase';
+import { useAuth } from '../context/AuthContext';
 
 /**
  * Custom hook for managing notes
@@ -9,30 +11,44 @@ import { DEFAULTS } from '../constants';
 export function useNotes(): UseNotesReturn {
   const [notes, setNotes] = useState<Note[]>([]);
   const [activeNote, setActiveNote] = useState<Note | null>(null);
+  const { user } = useAuth();
 
-  // Load notes from storage on mount
   useEffect(() => {
-    const loadedNotes = storageService.getNotes();
-    // Reset processing state on load to prevent stuck states and ensure tags exist
-    const processedNotes = loadedNotes.map(note => ({
-      ...note,
-      isProcessing: false,
-      tags: note.tags || [], // Ensure tags array exists for backward compatibility
-    }));
-    setNotes(processedNotes);
-  }, []);
-
-  // Save notes to storage whenever they change
-  useEffect(() => {
-    if (notes.length > 0 || storageService.getNotes().length > 0) {
-      storageService.saveNotes(notes);
+    if (!user) {
+      setNotes([]);
+      setActiveNote(null);
+      return;
     }
-  }, [notes]);
+
+    const notesRef = collection(db, 'users', user.uid, 'notes');
+    const unsubscribe = onSnapshot(
+      notesRef,
+      snapshot => {
+        const loadedNotes: Note[] = snapshot.docs.map(docSnap => {
+          const data = docSnap.data() as Note;
+          return {
+            ...data,
+            id: data.id ?? docSnap.id,
+            isProcessing: false,
+          };
+        });
+
+        loadedNotes.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+        setNotes(loadedNotes);
+      },
+      error => {
+        console.error('Error loading notes from Firestore:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user, db]);
 
   const createNote = useCallback((
     type: NoteType,
     initialData?: { url?: string; text?: string }
   ): Note => {
+    const uid = user?.uid;
     const newNote: Note = {
       id: crypto.randomUUID(),
       title: DEFAULTS.NOTE_TITLE,
@@ -55,8 +71,18 @@ export function useNotes(): UseNotesReturn {
     };
 
     setNotes(prev => [newNote, ...prev]);
+
+    if (uid) {
+      const noteRef = doc(collection(db, 'users', uid, 'notes'), newNote.id);
+      setDoc(noteRef, newNote).catch(error => {
+        console.error('Error creating note in Firestore:', error);
+      });
+    } else {
+      console.warn('Cannot persist note to Firestore: no authenticated user');
+    }
+
     return newNote;
-  }, []);
+  }, [user, db]);
 
   const updateNote = useCallback((id: string, updates: Partial<Note>) => {
     setNotes(prev => prev.map(note =>
@@ -66,7 +92,17 @@ export function useNotes(): UseNotesReturn {
     setActiveNote(prev =>
       prev?.id === id ? { ...prev, ...updates } : prev
     );
-  }, []);
+
+    const uid = user?.uid;
+    if (uid) {
+      const noteRef = doc(db, 'users', uid, 'notes', id);
+      updateDoc(noteRef, updates as Partial<Note>).catch(error => {
+        console.error('Error updating note in Firestore:', error);
+      });
+    } else {
+      console.warn('Cannot update note in Firestore: no authenticated user');
+    }
+  }, [user, db]);
 
   const deleteNote = useCallback((noteId: string) => {
     setNotes(prev => prev.filter(note => note.id !== noteId));
@@ -77,7 +113,17 @@ export function useNotes(): UseNotesReturn {
       }
       return prev;
     });
-  }, []);
+
+    const uid = user?.uid;
+    if (uid) {
+      const noteRef = doc(db, 'users', uid, 'notes', noteId);
+      deleteDoc(noteRef).catch(error => {
+        console.error('Error deleting note from Firestore:', error);
+      });
+    } else {
+      console.warn('Cannot delete note from Firestore: no authenticated user');
+    }
+  }, [user, db]);
 
   return {
     notes,
