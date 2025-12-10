@@ -35,16 +35,17 @@ View your app in AI Studio: https://ai.studio/apps/drive/18JlSBdsfUj_mCG8zAVZQY8
 
 Use the provided `Dockerfile` and `cloudbuild.yaml` to build and deploy the static Vite bundle to Cloud Run with Cloud Build.
 
-1. **Enable required services** in your Google Cloud project (only needed once):
+1. **Populate `.env.cloudbuild`:** copy your production values into [.env.cloudbuild](.env.cloudbuild). This file is included in the Docker build context and read when Vite runs with `--mode cloudbuild`.
+2. **Enable required services** in your Google Cloud project (only needed once):
    ```bash
    gcloud services enable cloudbuild.googleapis.com run.googleapis.com artifactregistry.googleapis.com
    ```
-2. **Build the container locally (optional)**
+3. **Build the container locally (optional)**
    ```bash
    docker build -t menthe-web .
    docker run -p 8080:8080 menthe-web
    ```
-3. **Submit a Cloud Build** (replaces the failing build that complained about the missing Dockerfile):
+4. **Submit a Cloud Build** (replaces the failing build that complained about the missing Dockerfile):
    ```bash
    gcloud builds submit \
      --config cloudbuild.yaml \
