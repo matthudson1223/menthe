@@ -4,6 +4,13 @@ import * as geminiService from '../services/geminiService';
 import { MESSAGES } from '../constants';
 import { isDefaultTitle, retryWithBackoff } from '../utils/helpers';
 
+const buildCombinedTranscript = (note: Note): string => {
+  const audioPart = note.audioTranscript || note.verbatimText || '';
+  const imagePart = note.imageTranscript || '';
+
+  return [audioPart, imagePart].filter(Boolean).join('\n\n---\n\n');
+};
+
 /**
  * Custom hook for AI note processing operations
  */
@@ -25,36 +32,46 @@ export function useNoteProcessing(
     updateNote(note.id, { isProcessing: true });
 
     try {
-      // 1. Transcribe (if not already transcribed)
-      let verbatim = initialTranscript || '';
+      // Transcribe only (no summary/title here)
+      let audioTranscript = type === 'audio' ? (initialTranscript || '') : '';
+      let imageTranscript = '';
 
-      if (!verbatim) {
+      if (type === 'audio' && !audioTranscript) {
         setProcessingStatus({ step: 'transcribing', message: 'Transcribing content...' });
-
-        const transcribeFn = type === 'image'
-          ? () => geminiService.transcribeImage(base64Data, mimeType)
-          : () => geminiService.transcribeAudio(base64Data, mimeType);
-
-        verbatim = await retryWithBackoff(transcribeFn);
+        audioTranscript = await retryWithBackoff(() =>
+          geminiService.transcribeAudio(base64Data, mimeType)
+        );
       }
 
-      updateNote(note.id, { verbatimText: verbatim });
-
-      // 2. Summarize
-      setProcessingStatus({ step: 'summarizing', message: 'Generating summary...' });
-      const summary = await retryWithBackoff(() =>
-        geminiService.generateSummary(verbatim, note.userNotes)
-      );
-      updateNote(note.id, { summaryText: summary });
-
-      // 3. Generate title
-      setProcessingStatus({ step: 'titling', message: 'Creating title...' });
-      const title = await retryWithBackoff(() =>
-        geminiService.generateTitle(verbatim.substring(0, 1000))
-      );
-      updateNote(note.id, { title });
+      if (type === 'image') {
+        setProcessingStatus({ step: 'transcribing', message: 'Transcribing content...' });
+        imageTranscript = await retryWithBackoff(() =>
+          geminiService.transcribeImage(base64Data, mimeType)
+        );
+      }
 
       setProcessingStatus({ step: 'idle', message: '' });
+
+      if (type === 'audio') {
+        const existingAudio = note.audioTranscript || note.verbatimText || '';
+        const combinedAudio = existingAudio
+          ? `${existingAudio}\n\n---\n\n${audioTranscript}`
+          : audioTranscript;
+
+        updateNote(note.id, {
+          verbatimText: combinedAudio,
+          audioTranscript: combinedAudio,
+        });
+      } else if (type === 'image') {
+        const existingImage = note.imageTranscript || '';
+        const combinedImage = existingImage
+          ? `${existingImage}\n\n---\n\n${imageTranscript}`
+          : imageTranscript;
+
+        updateNote(note.id, {
+          imageTranscript: combinedImage,
+        });
+      }
     } catch (error) {
       console.error('Processing failed:', error);
       setProcessingStatus({ step: 'idle', message: '' });
@@ -65,20 +82,26 @@ export function useNoteProcessing(
   }, [updateNote]);
 
   const generateSummary = useCallback(async (note: Note) => {
-    if (!note.verbatimText && !note.userNotes) {
+    const hasTranscriptContent =
+      !!note.verbatimText || !!note.audioTranscript || !!note.imageTranscript;
+
+    if (!hasTranscriptContent && !note.userNotes) {
       throw new Error(MESSAGES.NO_CONTENT_TO_SUMMARIZE);
     }
 
     updateNote(note.id, { isProcessing: true });
 
     try {
+      const combinedTranscript = buildCombinedTranscript(note);
+
       const promises: Promise<string>[] = [
         retryWithBackoff(() =>
-          geminiService.generateSummary(note.verbatimText, note.userNotes)
+          geminiService.generateSummary(combinedTranscript, note.userNotes)
         )
       ];
 
-      const contentForTitle = (note.userNotes || '') + '\n' + (note.verbatimText || '');
+      const contentForTitle =
+        (note.userNotes || '') + '\n' + (combinedTranscript || '');
       const shouldGenerateTitle = isDefaultTitle(note.title) && contentForTitle;
 
       if (shouldGenerateTitle) {

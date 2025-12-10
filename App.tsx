@@ -67,7 +67,18 @@ function AppContent() {
       await recording.startRecording(async (dataUrl, base64Data) => {
         const currentNote = notes.notes.find((n) => n.id === targetNote!.id);
         if (currentNote) {
-          notes.updateNote(targetNote!.id, { originalMediaUrl: dataUrl });
+          const existingItems = currentNote.mediaItems || [];
+          const newItem = {
+            id: crypto.randomUUID(),
+            type: 'audio' as const,
+            url: dataUrl,
+            createdAt: Date.now(),
+          };
+
+          notes.updateNote(targetNote!.id, {
+            originalMediaUrl: dataUrl,
+            mediaItems: [...existingItems, newItem],
+          });
 
           try {
             await processing.processNote(

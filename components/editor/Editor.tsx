@@ -61,24 +61,41 @@ export const Editor = React.memo<EditorProps>(({
   }
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
-    const base64 = await geminiService.fileToBase64(file);
-    const mimeType = file.type;
-    const url = `data:${mimeType};base64,${base64}`;
+    const currentNote = notes.activeNote;
+    if (!currentNote) return;
 
-    notes.updateNote(activeNote.id, {
-      type: 'image',
-      originalMediaUrl: url,
-    });
+    let mediaItems = currentNote.mediaItems || [];
 
-    setActiveTab('files');
+    for (const file of Array.from(files)) {
+      const base64 = await geminiService.fileToBase64(file);
+      const mimeType = file.type;
+      const url = `data:${mimeType};base64,${base64}`;
 
-    try {
-      await processing.processNote(activeNote, base64, mimeType, 'image', activeNote.verbatimText);
-    } catch (error) {
-      alert(MESSAGES.PROCESSING_ERROR);
+      const newItem = {
+        id: crypto.randomUUID(),
+        type: 'image' as const,
+        url,
+        createdAt: Date.now(),
+      };
+
+      mediaItems = [...mediaItems, newItem];
+
+      notes.updateNote(currentNote.id, {
+        type: 'image',
+        originalMediaUrl: url,
+        mediaItems,
+      });
+
+      setActiveTab('files');
+
+      try {
+        await processing.processNote(currentNote, base64, mimeType, 'image');
+      } catch (error) {
+        alert(MESSAGES.PROCESSING_ERROR);
+      }
     }
   };
 
@@ -333,10 +350,10 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
             {new Date(activeNote.createdAt).toLocaleString()}
           </p>
 
-          {activeNote.type === 'image' && activeNote.originalMediaUrl && (
+          {activeNote.type === 'image' && (activeNote.mediaItems?.length || activeNote.originalMediaUrl) && (
             <div className="mb-8 flex justify-center bg-slate-50 p-4 rounded-lg">
               <img
-                src={activeNote.originalMediaUrl}
+                src={activeNote.mediaItems?.find((item) => item.type === 'image')?.url || activeNote.originalMediaUrl}
                 alt="Note Attachment"
                 style={{ maxWidth: '100%', maxHeight: '400px' }}
               />

@@ -37,6 +37,14 @@ export function useNotes(): UseNotesReturn {
       title: DEFAULTS.NOTE_TITLE,
       type,
       originalMediaUrl: initialData?.url,
+      mediaItems: initialData?.url
+        ? [{
+            id: crypto.randomUUID(),
+            type: type === 'audio' ? 'audio' : 'image',
+            url: initialData.url,
+            createdAt: Date.now(),
+          }]
+        : [],
       verbatimText: '',
       userNotes: initialData?.text || '',
       summaryText: '',

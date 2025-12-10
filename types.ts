@@ -1,12 +1,22 @@
 // Note Types
 export type NoteType = 'image' | 'audio' | 'text';
 
+export interface MediaItem {
+  id: string;
+  type: 'image' | 'audio';
+  url: string;
+  createdAt: number;
+}
+
 export interface Note {
   id: string;
   title: string;
   type: NoteType;
   originalMediaUrl?: string; // base64 data url for display/playback
-  verbatimText: string;
+  mediaItems?: MediaItem[];
+  verbatimText: string; // primary transcript shown in Transcript tab (audio-focused)
+  audioTranscript?: string; // full audio transcript (kept in sync with verbatimText)
+  imageTranscript?: string; // image-derived text, stored for summarization
   userNotes?: string; // Manual user notes separate from transcript
   summaryText: string;
   createdAt: number;

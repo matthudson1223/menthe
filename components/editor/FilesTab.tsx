@@ -1,5 +1,5 @@
 import React from 'react';
-import { Paperclip, FileAudio } from 'lucide-react';
+import { Paperclip, FileAudio, ImageIcon } from 'lucide-react';
 import type { Note } from '../../types';
 
 interface FilesTabProps {
@@ -8,6 +8,12 @@ interface FilesTabProps {
 }
 
 export const FilesTab = React.memo<FilesTabProps>(({ note, isFullWidth }) => {
+  const mediaItems = note.mediaItems || [];
+  const imageItems = mediaItems.filter((item) => item.type === 'image');
+  const audioItems = mediaItems.filter((item) => item.type === 'audio');
+
+  const hasAnyMedia = imageItems.length > 0 || audioItems.length > 0 || note.originalMediaUrl;
+
   return (
     <div
       className={`mx-auto transition-all duration-300 ${
@@ -15,33 +21,53 @@ export const FilesTab = React.memo<FilesTabProps>(({ note, isFullWidth }) => {
       }`}
     >
       <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 min-h-[50vh] transition-colors">
-        {note.originalMediaUrl ? (
-          <div className="flex flex-col gap-4">
+        {hasAnyMedia ? (
+          <div className="flex flex-col gap-6">
             <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-2">
               <Paperclip size={14} /> Attached Media
             </h3>
-            {note.type === 'image' && (
-              <div className="p-2 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-700">
-                <img
-                  src={note.originalMediaUrl}
-                  alt="Attached File"
-                  className="w-full rounded-lg shadow-sm"
-                />
+
+            {imageItems.length > 0 && (
+              <div className="space-y-3">
+                {imageItems.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="p-2 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-700"
+                  >
+                    <div className="flex items-center gap-2 mb-2 text-xs text-slate-500 dark:text-slate-400">
+                      <ImageIcon size={14} />
+                      <span>Image {index + 1}</span>
+                    </div>
+                    <img
+                      src={item.url}
+                      alt={`Attached File ${index + 1}`}
+                      className="w-full rounded-lg shadow-sm"
+                    />
+                  </div>
+                ))}
               </div>
             )}
-            {note.type === 'audio' && (
-              <div className="p-6 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-700 flex items-center gap-4">
-                <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full">
-                  <FileAudio size={24} />
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-700 dark:text-slate-200">
-                    Voice Recording
-                  </p>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Attached • Playback Disabled
-                  </p>
-                </div>
+
+            {audioItems.length > 0 && (
+              <div className="space-y-3">
+                {audioItems.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-700 flex items-center gap-4"
+                  >
+                    <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full">
+                      <FileAudio size={24} />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-700 dark:text-slate-200">
+                        Voice Recording {index + 1}
+                      </p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Attached • Playback Disabled
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

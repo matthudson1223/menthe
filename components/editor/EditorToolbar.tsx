@@ -159,6 +159,7 @@ export const EditorToolbar = React.memo<EditorToolbarProps>(({
             <input
               type="file"
               accept="image/*"
+              multiple
               className="hidden"
               onChange={onImageUpload}
             />
