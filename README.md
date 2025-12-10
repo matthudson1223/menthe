@@ -31,6 +31,34 @@ View your app in AI Studio: https://ai.studio/apps/drive/18JlSBdsfUj_mCG8zAVZQY8
    npm run dev
    ```
 
+## Deploy to Google Cloud
+
+Use the provided `Dockerfile` and `cloudbuild.yaml` to build and deploy the static Vite bundle to Cloud Run with Cloud Build.
+
+1. **Enable required services** in your Google Cloud project (only needed once):
+   ```bash
+   gcloud services enable cloudbuild.googleapis.com run.googleapis.com artifactregistry.googleapis.com
+   ```
+2. **Build the container locally (optional)**
+   ```bash
+   docker build -t menthe-web .
+   docker run -p 8080:8080 menthe-web
+   ```
+3. **Submit a Cloud Build** (replaces the failing build that complained about the missing Dockerfile):
+   ```bash
+   gcloud builds submit \
+     --config cloudbuild.yaml \
+     --substitutions=_SERVICE_NAME=menthe-web,_REGION=us-central1,_IMAGE=gcr.io/$PROJECT_ID/menthe-web:$COMMIT_SHA
+   ```
+   - `_SERVICE_NAME`: Cloud Run service name.
+   - `_REGION`: Cloud Run region (e.g., `us-central1`).
+   - `_IMAGE`: Artifact Registry/Container Registry image URI.
+
+Cloud Build will:
+- Build the production bundle with `npm ci && npm run build`.
+- Package it into an Nginx container that serves all client-side routes (SPA fallback handled in `deployment/nginx.conf`).
+- Push the image and deploy it to Cloud Run with unauthenticated access enabled.
+
 ## Google Drive Integration Setup
 
 To enable the "Save to Drive" feature, you need to set up Google OAuth:

@@ -1,0 +1,44 @@
+substitutions:
+  _SERVICE_NAME: menthe-web
+  _REGION: us-central1
+  _IMAGE: gcr.io/$PROJECT_ID/menthe-web:$COMMIT_SHA
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: Build image
+    env:
+      - DOCKER_BUILDKIT=1
+    args:
+      - build
+      - -t
+      - $_IMAGE
+      - -f
+      - Dockerfile
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    id: Push image
+    args:
+      - push
+      - $_IMAGE
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Deploy to Cloud Run
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - $_SERVICE_NAME
+      - --image
+      - $_IMAGE
+      - --region
+      - $_REGION
+      - --platform
+      - managed
+      - --allow-unauthenticated
+
+images:
+  - $_IMAGE
+
+options:
+  logging: CLOUD_LOGGING_ONLY
