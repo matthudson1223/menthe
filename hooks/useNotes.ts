@@ -13,10 +13,11 @@ export function useNotes(): UseNotesReturn {
   // Load notes from storage on mount
   useEffect(() => {
     const loadedNotes = storageService.getNotes();
-    // Reset processing state on load to prevent stuck states
+    // Reset processing state on load to prevent stuck states and ensure tags exist
     const processedNotes = loadedNotes.map(note => ({
       ...note,
       isProcessing: false,
+      tags: note.tags || [], // Ensure tags array exists for backward compatibility
     }));
     setNotes(processedNotes);
   }, []);
@@ -48,6 +49,7 @@ export function useNotes(): UseNotesReturn {
       verbatimText: '',
       userNotes: initialData?.text || '',
       summaryText: '',
+      tags: [],
       createdAt: Date.now(),
       isProcessing: false,
     };

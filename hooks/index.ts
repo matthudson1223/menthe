@@ -6,3 +6,4 @@ export { useRecording } from './useRecording';
 export { useKeyboardShortcuts } from './useKeyboardShortcuts';
 export { useAutoSave } from './useAutoSave';
 export { useAutoTitle } from './useAutoTitle';
+export { useNoteTags } from './useNoteTags';

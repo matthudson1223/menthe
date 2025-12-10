@@ -19,6 +19,7 @@ export interface Note {
   imageTranscript?: string; // image-derived text, stored for summarization
   userNotes?: string; // Manual user notes separate from transcript
   summaryText: string;
+  tags: string[]; // User-defined tags for organization
   createdAt: number;
   isProcessing: boolean;
   driveFileId?: string; // Google Drive file ID for saved files

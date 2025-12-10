@@ -9,6 +9,7 @@ import { NoteTab } from './NoteTab';
 import { FilesTab } from './FilesTab';
 import { TranscriptTab } from './TranscriptTab';
 import { SummaryTab } from './SummaryTab';
+import { TagManager } from '../TagManager';
 import { useNotesContext } from '../../context/NotesContext';
 import * as geminiService from '../../services/geminiService';
 import * as driveService from '../../services/driveService';
@@ -126,9 +127,13 @@ export const Editor = React.memo<EditorProps>(({
       ? tiptapToMarkdown(activeNote.userNotes)
       : '';
 
+    const tagsLine = (activeNote.tags && activeNote.tags.length > 0)
+      ? `Tags: ${activeNote.tags.join(', ')}\n\n`
+      : '';
+
     const content = `# ${activeNote.title}
 Date: ${new Date(activeNote.createdAt).toLocaleString()}
-
+${tagsLine}
 ${activeNote.summaryText ? `## Summary\n${activeNote.summaryText}\n` : ''}
 ${userNotesMarkdown ? `## User Notes\n${userNotesMarkdown}\n` : ''}
 ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`;
@@ -242,7 +247,7 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
 
       {/* Title Area */}
       <div
-        className={`px-4 md:px-6 pt-6 pb-2 mx-auto ${
+        className={`px-4 md:px-6 pt-6 pb-4 mx-auto ${
           isFullWidth ? 'w-full md:px-8' : 'max-w-3xl'
         }`}
       >
@@ -256,6 +261,14 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
           <Clock size={12} />
           {new Date(activeNote.createdAt).toLocaleString()}
         </p>
+
+        {/* Tags Manager */}
+        <div className="mt-4">
+          <TagManager
+            note={activeNote}
+            updateNote={(id, updates) => notes.updateNote(id, updates)}
+          />
+        </div>
       </div>
 
       {/* Content Tabs & Actions */}
@@ -346,9 +359,23 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
       >
         <div className="text-slate-900 font-sans">
           <h1 className="text-3xl font-bold mb-2 text-slate-900">{activeNote.title}</h1>
-          <p className="text-sm text-slate-500 mb-8 pb-4 border-b border-slate-100">
+          <p className="text-sm text-slate-500 pb-4 border-b border-slate-100">
             {new Date(activeNote.createdAt).toLocaleString()}
           </p>
+
+          {/* Tags in PDF */}
+          {activeNote.tags && activeNote.tags.length > 0 && (
+            <div className="mb-8 mt-4 flex flex-wrap gap-2">
+              {activeNote.tags.map(tag => (
+                <span
+                  key={tag}
+                  className="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
 
           {activeNote.type === 'image' && (activeNote.mediaItems?.length || activeNote.originalMediaUrl) && (
             <div className="mb-8 flex justify-center bg-slate-50 p-4 rounded-lg">

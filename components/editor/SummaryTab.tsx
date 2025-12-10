@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Wand2, ArrowLeft, Sparkles, BrainCircuit, Edit2, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { TagManager } from '../TagManager';
 import type { Note } from '../../types';
 
 interface SummaryTabProps {
@@ -114,6 +115,16 @@ export const SummaryTab = React.memo<SummaryTabProps>(({
               )}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Tags Manager */}
+      {note.summaryText && (
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
+          <TagManager
+            note={note}
+            updateNote={onUpdate}
+          />
         </div>
       )}
     </div>
