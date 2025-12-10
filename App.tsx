@@ -126,8 +126,11 @@ function AppContent() {
 }
 
 export default function App() {
-  // Get Google Client ID from environment variable
-  const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
+  // Vite injects client IDs prefixed with VITE_ during build.
+  const googleClientId =
+    import.meta.env?.VITE_GOOGLE_CLIENT_ID ??
+    process.env.GOOGLE_CLIENT_ID ??
+    '';
 
   return (
     <ErrorBoundary>

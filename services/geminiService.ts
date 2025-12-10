@@ -1,7 +1,15 @@
 import { GoogleGenAI } from "@google/genai";
 import { GeminiModel } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Vite inlines variables prefixed with VITE_ at build time; keep a Node fallback for tooling/tests.
+const GEMINI_API_KEY =
+  import.meta.env?.VITE_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY ?? process.env.API_KEY;
+
+if (!GEMINI_API_KEY) {
+  throw new Error("Missing Gemini API key. Set VITE_GEMINI_API_KEY in your environment.");
+}
+
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 // Helper to convert blob/file to base64
 export const fileToBase64 = (file: globalThis.Blob): Promise<string> => {

@@ -23,8 +23,8 @@ View your app in AI Studio: https://ai.studio/apps/drive/18JlSBdsfUj_mCG8zAVZQY8
    ```
 
 2. Configure environment variables in [.env.local](.env.local):
-   - `GEMINI_API_KEY` - Your Gemini API key (required)
-   - `GOOGLE_CLIENT_ID` - Your Google OAuth Client ID (required for Google Drive integration)
+   - `VITE_GEMINI_API_KEY` - Your Gemini API key (required)
+   - `VITE_GOOGLE_CLIENT_ID` - Your Google OAuth Client ID (required for Google Drive integration)
 
 3. Run the app:
    ```bash
@@ -88,7 +88,7 @@ To enable the "Save to Drive" feature, you need to set up Google OAuth:
    - Copy the generated Client ID
    - Add it to your `.env.local` file:
      ```
-     GOOGLE_CLIENT_ID="your-client-id-here.apps.googleusercontent.com"
+     VITE_GOOGLE_CLIENT_ID="your-client-id-here.apps.googleusercontent.com"
      ```
 
 5. **Restart the development server:**
