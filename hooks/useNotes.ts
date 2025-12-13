@@ -77,7 +77,7 @@ export function useNotes(): UseNotesReturn {
       id: crypto.randomUUID(),
       title: DEFAULTS.NOTE_TITLE,
       type,
-      originalMediaUrl: initialData?.url,
+      ...(initialData?.url ? { originalMediaUrl: initialData.url } : {}),
       mediaItems: initialData?.url
         ? [{
             id: crypto.randomUUID(),
