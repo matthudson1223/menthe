@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { Note, NoteType, UseNotesReturn } from '../types';
 import { DEFAULTS } from '../constants';
@@ -12,6 +12,30 @@ export function useNotes(): UseNotesReturn {
   const [notes, setNotes] = useState<Note[]>([]);
   const [activeNote, setActiveNote] = useState<Note | null>(null);
   const { user } = useAuth();
+  const pendingWrites = useRef<Map<string, Promise<void>>>(new Map());
+
+  const enqueueWrite = useCallback(
+    (noteId: string, operation: () => Promise<void>, onError: (error: unknown) => void) => {
+      const previous = pendingWrites.current.get(noteId) ?? Promise.resolve();
+
+      const next = previous
+        .catch(() => {
+          // Swallow previous errors so future writes still run
+        })
+        .then(operation)
+        .catch(error => {
+          onError(error);
+        })
+        .finally(() => {
+          if (pendingWrites.current.get(noteId) === next) {
+            pendingWrites.current.delete(noteId);
+          }
+        });
+
+      pendingWrites.current.set(noteId, next);
+    },
+    []
+  );
 
   useEffect(() => {
     if (!user) {
@@ -74,7 +98,7 @@ export function useNotes(): UseNotesReturn {
 
     if (uid) {
       const noteRef = doc(collection(db, 'users', uid, 'notes'), newNote.id);
-      setDoc(noteRef, newNote).catch(error => {
+      enqueueWrite(newNote.id, () => setDoc(noteRef, newNote), error => {
         console.error('Error creating note in Firestore:', error);
       });
     } else {
@@ -82,7 +106,7 @@ export function useNotes(): UseNotesReturn {
     }
 
     return newNote;
-  }, [user, db]);
+  }, [user, db, enqueueWrite]);
 
   const updateNote = useCallback((id: string, updates: Partial<Note>) => {
     setNotes(prev => prev.map(note =>
@@ -96,13 +120,13 @@ export function useNotes(): UseNotesReturn {
     const uid = user?.uid;
     if (uid) {
       const noteRef = doc(db, 'users', uid, 'notes', id);
-      updateDoc(noteRef, updates as Partial<Note>).catch(error => {
+      enqueueWrite(id, () => updateDoc(noteRef, updates as Partial<Note>), error => {
         console.error('Error updating note in Firestore:', error);
       });
     } else {
       console.warn('Cannot update note in Firestore: no authenticated user');
     }
-  }, [user, db]);
+  }, [user, db, enqueueWrite]);
 
   const deleteNote = useCallback((noteId: string) => {
     setNotes(prev => prev.filter(note => note.id !== noteId));
@@ -117,13 +141,13 @@ export function useNotes(): UseNotesReturn {
     const uid = user?.uid;
     if (uid) {
       const noteRef = doc(db, 'users', uid, 'notes', noteId);
-      deleteDoc(noteRef).catch(error => {
+      enqueueWrite(noteId, () => deleteDoc(noteRef), error => {
         console.error('Error deleting note from Firestore:', error);
       });
     } else {
       console.warn('Cannot delete note from Firestore: no authenticated user');
     }
-  }, [user, db]);
+  }, [user, db, enqueueWrite]);
 
   return {
     notes,
