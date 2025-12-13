@@ -28,6 +28,16 @@ const applyUpdates = (note: Note, updates: Partial<Note>): Note => {
   return updatedNote;
 };
 
+const removeUndefinedFields = <T extends Record<string, unknown>>(obj: T): T => {
+  const cleaned = {} as T;
+  Object.entries(obj).forEach(([key, value]) => {
+    if (value !== undefined) {
+      (cleaned as Record<string, unknown>)[key] = value;
+    }
+  });
+  return cleaned;
+};
+
 export function useNotes(): UseNotesReturn {
   const [notes, setNotes] = useState<Note[]>([]);
   const [activeNote, setActiveNote] = useState<Note | null>(null);
@@ -114,11 +124,13 @@ export function useNotes(): UseNotesReturn {
       isProcessing: false,
     };
 
-    setNotes(prev => [newNote, ...prev]);
+    const cleanedNote = removeUndefinedFields(newNote);
+
+    setNotes(prev => [cleanedNote, ...prev]);
 
     if (uid) {
-      const noteRef = doc(collection(db, 'users', uid, 'notes'), newNote.id);
-      enqueueWrite(newNote.id, () => setDoc(noteRef, newNote), error => {
+      const noteRef = doc(collection(db, 'users', uid, 'notes'), cleanedNote.id);
+      enqueueWrite(cleanedNote.id, () => setDoc(noteRef, cleanedNote), error => {
         console.error('Error creating note in Firestore:', error);
       });
     } else {
