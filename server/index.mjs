@@ -43,7 +43,7 @@ app.post("/api/gemini/transcribe-image", async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       contents: {
         parts: [
           {
@@ -75,7 +75,7 @@ app.post("/api/gemini/transcribe-audio", async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       contents: {
         parts: [
           {
@@ -106,7 +106,7 @@ app.post("/api/gemini/summary", async (req, res) => {
     const prompt = buildPromptForSummary(transcript ?? "", userNotes ?? "");
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-pro",
+      model: "gemini-2.5-pro",
       contents: {
         parts: [{ text: prompt }],
       },
@@ -133,7 +133,7 @@ app.post("/api/gemini/title", async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash-lite",
+      model: "gemini-2.5-flash-lite",
       contents: {
         parts: [
           {
@@ -164,7 +164,7 @@ app.post("/api/gemini/refine-summary", async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-pro",
+      model: "gemini-2.5-pro",
       contents: {
         parts: [
           {
@@ -203,7 +203,7 @@ app.post("/api/gemini/tags", async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       contents: {
         parts: [
           {
@@ -244,7 +244,7 @@ app.post("/api/gemini/chat", async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-pro",
+      model: "gemini-2.5-pro",
       contents: message,
     });
 
