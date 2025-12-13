@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { NotesProvider, useNotesContext } from './context/NotesContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ErrorProvider, useErrorHandler } from './hooks/useErrorHandler';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ProcessingOverlay } from './components/ProcessingOverlay';
 import { Dashboard } from './components/Dashboard';
@@ -17,6 +18,7 @@ import type { ViewType, TabType, Note } from './types';
 function AppContent() {
   const { user, loading: authLoading, signOut } = useAuth();
   const { notes, processing, recording } = useNotesContext();
+  const { showError } = useErrorHandler();
   const [view, setView] = useState<ViewType>('dashboard');
   const [activeTab, setActiveTab] = useState<TabType>('notes');
 
@@ -92,13 +94,18 @@ function AppContent() {
               ''
             );
           } catch (error) {
-            alert(MESSAGES.PROCESSING_ERROR);
+            showError(MESSAGES.PROCESSING_ERROR, {
+              noteId: currentNote.id,
+              mediaType: 'audio'
+            }, error instanceof Error ? error.stack : undefined);
           }
         }
       });
     } catch (error) {
       if (error instanceof Error) {
-        alert(error.message);
+        showError(error.message, {
+          action: 'startRecording'
+        }, error.stack);
       }
     }
   }
@@ -162,7 +169,9 @@ export default function App() {
       <GoogleOAuthProvider clientId={googleClientId}>
         <AuthProvider>
           <NotesProvider>
-            <AppContent />
+            <ErrorProvider>
+              <AppContent />
+            </ErrorProvider>
           </NotesProvider>
         </AuthProvider>
       </GoogleOAuthProvider>

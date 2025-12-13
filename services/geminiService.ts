@@ -60,7 +60,10 @@ export const generateSummary = async (transcript: string, userNotes: string = ""
       body: JSON.stringify({ transcript, userNotes }),
     });
     if (!response.ok) {
-      throw new Error("Summarization failed");
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = `Summarization failed: ${response.status} ${response.statusText}${errorData.details ? ` - ${errorData.details}` : ''}`;
+      console.error(errorMessage, errorData);
+      throw new Error(errorMessage);
     }
     const data = await response.json();
     return data.text ?? "";

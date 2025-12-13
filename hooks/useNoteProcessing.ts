@@ -136,7 +136,21 @@ export function useNoteProcessing(
       updateNote(note.id, updates);
     } catch (error) {
       console.error('Summary generation failed:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        noteId: note.id,
+        hasTranscript: !!note.audioTranscript || !!note.verbatimText || !!note.imageTranscript,
+        hasUserNotes: !!note.userNotes,
+        transcriptLength: buildCombinedTranscript(note).length
+      });
       updateNote(note.id, { isProcessing: false });
+
+      // Preserve the original error for stack trace, but with user-friendly message
+      if (error instanceof Error) {
+        const enhancedError = new Error(error.message.includes('Summarization failed') ? error.message : MESSAGES.SUMMARY_GENERATION_FAILED);
+        enhancedError.stack = error.stack;
+        throw enhancedError;
+      }
       throw new Error(MESSAGES.SUMMARY_GENERATION_FAILED);
     }
   }, [updateNote]);

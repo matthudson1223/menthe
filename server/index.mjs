@@ -121,7 +121,14 @@ app.post("/api/gemini/summary", async (req, res) => {
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("Summarization error:", err);
-    res.status(500).json({ error: "Summarization failed" });
+    console.error("Error details:", {
+      message: err.message,
+      status: err.status,
+      statusText: err.statusText,
+      transcriptLength: req.body?.transcript?.length || 0,
+      hasUserNotes: !!req.body?.userNotes
+    });
+    res.status(500).json({ error: "Summarization failed", details: err.message });
   }
 });
 
