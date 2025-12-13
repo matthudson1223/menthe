@@ -1,0 +1,16 @@
+substitutions:
+  _API_IMAGE: gcr.io/gen-lang-client-0855075638/menthe-api
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - Dockerfile.api
+      - -t
+      - ${_API_IMAGE}
+      - .
+
+images:
+  - ${_API_IMAGE}
+
