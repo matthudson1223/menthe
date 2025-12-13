@@ -144,6 +144,13 @@ export function useNoteProcessing(
         transcriptLength: buildCombinedTranscript(note).length
       });
       updateNote(note.id, { isProcessing: false });
+
+      // Preserve the original error for stack trace, but with user-friendly message
+      if (error instanceof Error) {
+        const enhancedError = new Error(error.message.includes('Summarization failed') ? error.message : MESSAGES.SUMMARY_GENERATION_FAILED);
+        enhancedError.stack = error.stack;
+        throw enhancedError;
+      }
       throw new Error(MESSAGES.SUMMARY_GENERATION_FAILED);
     }
   }, [updateNote]);

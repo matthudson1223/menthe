@@ -11,6 +11,7 @@ import { TranscriptTab } from './TranscriptTab';
 import { SummaryTab } from './SummaryTab';
 import { TagManager } from '../TagManager';
 import { useNotesContext } from '../../context/NotesContext';
+import { useErrorHandler } from '../../hooks/useErrorHandler';
 import * as geminiService from '../../services/geminiService';
 import * as driveService from '../../services/driveService';
 import { MESSAGES, APP_CONFIG } from '../../constants';
@@ -32,6 +33,7 @@ export const Editor = React.memo<EditorProps>(({
   onStartRecording,
 }) => {
   const { notes, processing } = useNotesContext();
+  const { showError } = useErrorHandler();
   const [isFullWidth, setIsFullWidth] = useState(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [driveError, setDriveError] = useState<string | null>(null);
@@ -95,7 +97,10 @@ export const Editor = React.memo<EditorProps>(({
       try {
         await processing.processNote(currentNote, base64, mimeType, 'image');
       } catch (error) {
-        alert(MESSAGES.PROCESSING_ERROR);
+        showError(MESSAGES.PROCESSING_ERROR, {
+          noteId: currentNote.id,
+          mediaType: 'image'
+        }, error instanceof Error ? error.stack : undefined);
       }
     }
   };
@@ -162,7 +167,10 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
       await html2pdf().set(opt).from(element).save();
     } catch (e) {
       console.error('PDF generation failed', e);
-      alert(MESSAGES.PDF_GENERATION_FAILED);
+      showError(MESSAGES.PDF_GENERATION_FAILED, {
+        noteId: activeNote.id,
+        action: 'exportPDF'
+      }, e instanceof Error ? e.stack : undefined);
     }
   };
 
@@ -218,7 +226,12 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
       await processing.generateSummary(activeNote);
     } catch (error) {
       if (error instanceof Error) {
-        alert(error.message);
+        showError(error.message, {
+          noteId: activeNote.id,
+          action: 'generateSummary',
+          hasTranscript: !!activeNote.audioTranscript || !!activeNote.verbatimText || !!activeNote.imageTranscript,
+          hasUserNotes: !!activeNote.userNotes
+        }, error.stack);
       }
     }
   };
