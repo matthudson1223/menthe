@@ -29,10 +29,24 @@ const applyUpdates = (note: Note, updates: Partial<Note>): Note => {
 };
 
 const removeUndefinedFields = <T extends Record<string, unknown>>(obj: T): T => {
+  const cleanValue = (value: unknown): unknown => {
+    if (value === undefined) return undefined;
+    if (Array.isArray(value)) {
+      return value
+        .map(item => (typeof item === 'object' && item !== null ? cleanValue(item) : item))
+        .filter(item => item !== undefined);
+    }
+    if (value && typeof value === 'object') {
+      return removeUndefinedFields(value as Record<string, unknown>);
+    }
+    return value;
+  };
+
   const cleaned = {} as T;
   Object.entries(obj).forEach(([key, value]) => {
-    if (value !== undefined) {
-      (cleaned as Record<string, unknown>)[key] = value;
+    const cleanedValue = cleanValue(value);
+    if (cleanedValue !== undefined) {
+      (cleaned as Record<string, unknown>)[key] = cleanedValue;
     }
   });
   return cleaned;
@@ -137,7 +151,7 @@ export function useNotes(): UseNotesReturn {
       console.warn('Cannot persist note to Firestore: no authenticated user');
     }
 
-    return newNote;
+    return cleanedNote;
   }, [user, db, enqueueWrite]);
 
   const updateNote = useCallback((id: string, updates: Partial<Note>) => {
@@ -152,7 +166,7 @@ export function useNotes(): UseNotesReturn {
     const uid = user?.uid;
     if (uid) {
       const noteRef = doc(db, 'users', uid, 'notes', id);
-      const cleanedUpdates = sanitizeUpdates(updates);
+      const cleanedUpdates = removeUndefinedFields(sanitizeUpdates(updates));
       enqueueWrite(id, () => updateDoc(noteRef, cleanedUpdates), error => {
         console.error('Error updating note in Firestore:', error);
       });
