@@ -8,6 +8,26 @@ import { useAuth } from '../context/AuthContext';
 /**
  * Custom hook for managing notes
  */
+const sanitizeUpdates = (updates: Partial<Note>): Partial<Note> => {
+  const cleaned: Partial<Note> = {};
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value !== undefined) {
+      cleaned[key as keyof Note] = value;
+    }
+  });
+  return cleaned;
+};
+
+const applyUpdates = (note: Note, updates: Partial<Note>): Note => {
+  const updatedNote: Note = { ...note, ...updates };
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value === undefined) {
+      delete (updatedNote as Record<string, unknown>)[key];
+    }
+  });
+  return updatedNote;
+};
+
 export function useNotes(): UseNotesReturn {
   const [notes, setNotes] = useState<Note[]>([]);
   const [activeNote, setActiveNote] = useState<Note | null>(null);
@@ -110,17 +130,18 @@ export function useNotes(): UseNotesReturn {
 
   const updateNote = useCallback((id: string, updates: Partial<Note>) => {
     setNotes(prev => prev.map(note =>
-      note.id === id ? { ...note, ...updates } : note
+      note.id === id ? applyUpdates(note, updates) : note
     ));
 
     setActiveNote(prev =>
-      prev?.id === id ? { ...prev, ...updates } : prev
+      prev?.id === id ? applyUpdates(prev, updates) : prev
     );
 
     const uid = user?.uid;
     if (uid) {
       const noteRef = doc(db, 'users', uid, 'notes', id);
-      enqueueWrite(id, () => updateDoc(noteRef, updates as Partial<Note>), error => {
+      const cleanedUpdates = sanitizeUpdates(updates);
+      enqueueWrite(id, () => updateDoc(noteRef, cleanedUpdates), error => {
         console.error('Error updating note in Firestore:', error);
       });
     } else {
