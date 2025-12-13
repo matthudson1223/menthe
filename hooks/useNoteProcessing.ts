@@ -136,6 +136,13 @@ export function useNoteProcessing(
       updateNote(note.id, updates);
     } catch (error) {
       console.error('Summary generation failed:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        noteId: note.id,
+        hasTranscript: !!note.audioTranscript || !!note.verbatimText || !!note.imageTranscript,
+        hasUserNotes: !!note.userNotes,
+        transcriptLength: buildCombinedTranscript(note).length
+      });
       updateNote(note.id, { isProcessing: false });
       throw new Error(MESSAGES.SUMMARY_GENERATION_FAILED);
     }
