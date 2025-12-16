@@ -1,7 +1,6 @@
 substitutions:
   _SERVICE_NAME: menthe-api
   _REGION: asia-southeast1
-  _IMAGE_TAG: ${SHORT_SHA:-latest}
 
 steps:
   - name: gcr.io/cloud-builders/docker
@@ -13,7 +12,7 @@ steps:
       - -f
       - Dockerfile.api
       - -t
-      - gcr.io/$PROJECT_ID/menthe-api:$_IMAGE_TAG
+      - gcr.io/$PROJECT_ID/menthe-api:$BUILD_ID
       - -t
       - gcr.io/$PROJECT_ID/menthe-api:latest
       - .
@@ -43,7 +42,7 @@ steps:
       - GEMINI_API_KEY=menthe-gemini-api-key:latest
 
 images:
-  - gcr.io/$PROJECT_ID/menthe-api:$_IMAGE_TAG
+  - gcr.io/$PROJECT_ID/menthe-api:$BUILD_ID
   - gcr.io/$PROJECT_ID/menthe-api:latest
 
 options:
