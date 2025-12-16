@@ -1,7 +1,6 @@
 substitutions:
   _SERVICE_NAME: menthe-api
   _REGION: asia-southeast1
-  _API_IMAGE: gcr.io/$PROJECT_ID/menthe-api:$COMMIT_SHA
 
 steps:
   - name: gcr.io/cloud-builders/docker
@@ -13,14 +12,14 @@ steps:
       - -f
       - Dockerfile.api
       - -t
-      - ${_API_IMAGE}
+      - gcr.io/$PROJECT_ID/menthe-api:$SHORT_SHA
       - .
 
   - name: gcr.io/cloud-builders/docker
     id: Push API image
     args:
       - push
-      - ${_API_IMAGE}
+      - gcr.io/$PROJECT_ID/menthe-api:$SHORT_SHA
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: Deploy API to Cloud Run
@@ -30,7 +29,7 @@ steps:
       - deploy
       - $_SERVICE_NAME
       - --image
-      - ${_API_IMAGE}
+      - gcr.io/$PROJECT_ID/menthe-api:$SHORT_SHA
       - --region
       - $_REGION
       - --platform
@@ -40,7 +39,7 @@ steps:
       - GEMINI_API_KEY=menthe-gemini-api-key:latest
 
 images:
-  - ${_API_IMAGE}
+  - gcr.io/$PROJECT_ID/menthe-api:$SHORT_SHA
 
 options:
   logging: CLOUD_LOGGING_ONLY
