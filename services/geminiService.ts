@@ -1,5 +1,18 @@
 import { GeminiModel } from "../types";
 
+const normalizeBaseUrl = (base: string | undefined): string => {
+  const trimmed = (base || "").replace(/\/+$/, "");
+  if (!trimmed) {
+    console.warn("VITE_API_BASE_URL is not set; defaulting to http://localhost:8080");
+    return "http://localhost:8080";
+  }
+  return trimmed;
+};
+
+const API_BASE_URL = normalizeBaseUrl(import.meta.env.VITE_API_BASE_URL);
+
+const buildUrl = (path: string) => `${API_BASE_URL}${path}`;
+
 // Helper to convert blob/file to base64
 export const fileToBase64 = (file: globalThis.Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -17,7 +30,7 @@ export const fileToBase64 = (file: globalThis.Blob): Promise<string> => {
 
 export const transcribeImage = async (base64Image: string, mimeType: string): Promise<string> => {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/gemini/transcribe-image`, {
+    const response = await fetch(buildUrl("/api/gemini/transcribe-image"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ base64Image, mimeType }),
@@ -35,7 +48,7 @@ export const transcribeImage = async (base64Image: string, mimeType: string): Pr
 
 export const transcribeAudio = async (base64Audio: string, mimeType: string): Promise<string> => {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/gemini/transcribe-audio`, {
+    const response = await fetch(buildUrl("/api/gemini/transcribe-audio"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ base64Audio, mimeType }),
@@ -54,7 +67,7 @@ export const transcribeAudio = async (base64Audio: string, mimeType: string): Pr
 export const generateSummary = async (transcript: string, userNotes: string = ""): Promise<string> => {
   try {
     // Using Pro with Thinking for deep analysis
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/gemini/summary`, {
+    const response = await fetch(buildUrl("/api/gemini/summary"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ transcript, userNotes }),
@@ -75,7 +88,7 @@ export const generateSummary = async (transcript: string, userNotes: string = ""
 
 export const generateTitle = async (text: string): Promise<string> => {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/gemini/title`, {
+    const response = await fetch(buildUrl("/api/gemini/title"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
@@ -93,7 +106,7 @@ export const generateTitle = async (text: string): Promise<string> => {
 
 export const refineSummary = async (currentSummary: string, instruction: string): Promise<string> => {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/gemini/refine-summary`, {
+    const response = await fetch(buildUrl("/api/gemini/refine-summary"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ currentSummary, instruction }),
@@ -111,7 +124,7 @@ export const refineSummary = async (currentSummary: string, instruction: string)
 
 export const generateTags = async (summary: string, title: string = ""): Promise<string[]> => {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/gemini/tags`, {
+    const response = await fetch(buildUrl("/api/gemini/tags"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ summary, title }),
@@ -129,7 +142,7 @@ export const generateTags = async (summary: string, title: string = ""): Promise
 
 export const chatWithAI = async (message: string): Promise<string> => {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/gemini/chat`, {
+    const response = await fetch(buildUrl("/api/gemini/chat"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message }),
