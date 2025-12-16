@@ -1,7 +1,7 @@
 substitutions:
   _SERVICE_NAME: menthe-web
   _REGION: asia-southeast1
-  _IMAGE: gcr.io/$PROJECT_ID/menthe-web:$COMMIT_SHA
+  _IMAGE: gcr.io/$PROJECT_ID/menthe-web:$BUILD_ID
 
 steps:
   - name: gcr.io/cloud-builders/docker

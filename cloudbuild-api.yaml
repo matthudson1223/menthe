@@ -38,7 +38,9 @@ steps:
       - --platform
       - managed
       - --allow-unauthenticated
-      - --update-secrets
+      - --port
+      - '8080'
+      - --set-secrets
       - GEMINI_API_KEY=menthe-gemini-api-key:latest
 
 images:
