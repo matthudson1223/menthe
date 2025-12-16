@@ -1,6 +1,11 @@
 import express from "express";
 import cors from "cors";
 import { GoogleGenAI } from "@google/genai";
+import dotenv from "dotenv";
+
+// Load environment variables from .env.local (or .env if it exists)
+dotenv.config({ path: ".env.local" });
+dotenv.config(); // Fallback to .env
 
 const app = express();
 app.use(
@@ -10,7 +15,7 @@ app.use(
 );
 app.use(express.json({ limit: "20mb" }));
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
 
 if (!GEMINI_API_KEY) {
   // Fail fast on misconfiguration rather than 500s on every request
