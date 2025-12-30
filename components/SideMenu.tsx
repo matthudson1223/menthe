@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Menu, X, Tag, FolderOpen, LogOut, ChevronRight, FileText } from 'lucide-react';
+import { Menu, X, Tag, FolderOpen, LogOut, FileText } from 'lucide-react';
 import { useNotesContext } from '../context/NotesContext';
 import { useAuth } from '../context/AuthContext';
 import { Modal } from './ui';
@@ -18,10 +18,8 @@ export const SideMenu: React.FC<SideMenuProps> = ({
   const { notes } = useNotesContext();
   const { signOut, user } = useAuth();
 
-  // Get all unique tags from notes and count notes per tag
   const tagGroups = useMemo(() => {
     const tagCounts: Record<string, number> = {};
-
     notes.notes.forEach(note => {
       if (note.tags && note.tags.length > 0) {
         note.tags.forEach(tag => {
@@ -29,13 +27,11 @@ export const SideMenu: React.FC<SideMenuProps> = ({
         });
       }
     });
-
     return Object.entries(tagCounts)
       .sort((a, b) => b[1] - a[1])
       .map(([tag, count]) => ({ tag, count }));
   }, [notes.notes]);
 
-  // Count notes without tags
   const untaggedCount = useMemo(() => {
     return notes.notes.filter(note => !note.tags || note.tags.length === 0).length;
   }, [notes.notes]);
@@ -53,139 +49,110 @@ export const SideMenu: React.FC<SideMenuProps> = ({
 
   return (
     <>
-      {/* Hamburger Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+        className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
         aria-label="Open menu"
-        title="Open menu"
       >
-        <Menu size={20} />
+        <Menu size={18} />
       </button>
 
-      {/* Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity"
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
           onClick={() => setIsOpen(false)}
         />
       )}
 
-      {/* Side Panel */}
       <div
-        className={`fixed top-0 left-0 h-full w-72 bg-white dark:bg-slate-900 shadow-2xl z-50 transform transition-transform duration-300 ease-out flex flex-col ${
+        className={`fixed top-0 left-0 h-full w-64 bg-white dark:bg-slate-900 shadow-xl z-50 transform transition-transform duration-200 ease-out flex flex-col border-r border-slate-200 dark:border-slate-800 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Header */}
-        <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Note Groups
-          </h2>
+        <div className="p-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+          <span className="text-sm font-medium text-slate-900 dark:text-slate-100">Notes</span>
           <button
             onClick={() => setIsOpen(false)}
-            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
-            aria-label="Close menu"
+            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
           >
-            <X size={20} />
+            <X size={16} />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {/* All Notes */}
+        <div className="flex-1 overflow-y-auto p-2">
           <button
             onClick={() => handleGroupClick(null)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors mb-2 ${
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
               selectedGroup === null
-                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
             }`}
           >
-            <FolderOpen size={18} />
-            <span className="flex-1 text-left font-medium">All Notes</span>
-            <span className="text-sm text-slate-500 dark:text-slate-400">
-              {notes.notes.length}
-            </span>
+            <FolderOpen size={15} />
+            <span className="flex-1 text-left">All Notes</span>
+            <span className="text-xs text-slate-400">{notes.notes.length}</span>
           </button>
 
-          {/* Divider */}
-          <div className="my-4 border-t border-slate-200 dark:border-slate-700" />
+          {tagGroups.length > 0 && (
+            <>
+              <div className="mt-4 mb-2 px-3">
+                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Tags</span>
+              </div>
 
-          {/* Tag Groups */}
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 px-3">
-              Tags
+              {tagGroups.map(({ tag, count }) => (
+                <button
+                  key={tag}
+                  onClick={() => handleGroupClick(tag)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    selectedGroup === tag
+                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <Tag size={14} />
+                  <span className="flex-1 text-left truncate">{tag}</span>
+                  <span className="text-xs text-slate-400">{count}</span>
+                </button>
+              ))}
+
+              {untaggedCount > 0 && (
+                <button
+                  onClick={() => handleGroupClick('__untagged__')}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    selectedGroup === '__untagged__'
+                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                      : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <FileText size={14} />
+                  <span className="flex-1 text-left italic">Untagged</span>
+                  <span className="text-xs text-slate-400">{untaggedCount}</span>
+                </button>
+              )}
+            </>
+          )}
+
+          {tagGroups.length === 0 && (
+            <p className="text-xs text-slate-400 px-3 py-4">
+              Add tags to organize notes
             </p>
-
-            {tagGroups.length === 0 && untaggedCount === notes.notes.length ? (
-              <p className="text-sm text-slate-400 dark:text-slate-500 px-3 py-2">
-                No tags yet. Add tags to your notes to organize them into groups.
-              </p>
-            ) : (
-              <>
-                {tagGroups.map(({ tag, count }) => (
-                  <button
-                    key={tag}
-                    onClick={() => handleGroupClick(tag)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                      selectedGroup === tag
-                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                    }`}
-                  >
-                    <Tag size={16} />
-                    <span className="flex-1 text-left truncate">{tag}</span>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">
-                      {count}
-                    </span>
-                    <ChevronRight size={14} className="text-slate-400" />
-                  </button>
-                ))}
-
-                {/* Untagged notes */}
-                {untaggedCount > 0 && (
-                  <button
-                    onClick={() => handleGroupClick('__untagged__')}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                      selectedGroup === '__untagged__'
-                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                    }`}
-                  >
-                    <FileText size={16} />
-                    <span className="flex-1 text-left text-slate-500 dark:text-slate-400 italic">
-                      Untagged
-                    </span>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">
-                      {untaggedCount}
-                    </span>
-                    <ChevronRight size={14} className="text-slate-400" />
-                  </button>
-                )}
-              </>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* Footer - Sign Out */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+        <div className="p-3 border-t border-slate-100 dark:border-slate-800">
           {user && (
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 truncate">
-              Signed in as {user.email}
-            </p>
+            <p className="text-xs text-slate-400 mb-2 truncate px-1">{user.email}</p>
           )}
           <button
             onClick={() => setShowSignOutConfirm(true)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
           >
-            <LogOut size={18} />
-            <span className="font-medium">Sign out</span>
+            <LogOut size={15} />
+            <span>Sign out</span>
           </button>
         </div>
       </div>
 
-      {/* Sign Out Confirmation Modal */}
       <Modal
         isOpen={showSignOutConfirm}
         onClose={() => setShowSignOutConfirm(false)}
@@ -193,19 +160,19 @@ export const SideMenu: React.FC<SideMenuProps> = ({
         size="sm"
       >
         <div className="space-y-4">
-          <p className="text-slate-600 dark:text-slate-300">
-            Are you sure you want to sign out? Your notes are saved and will be here when you return.
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Sign out of your account? Your notes will be saved.
           </p>
-          <div className="flex gap-3 justify-end">
+          <div className="flex gap-2 justify-end">
             <button
               onClick={() => setShowSignOutConfirm(false)}
-              className="px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              className="px-3 py-1.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleSignOut}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
+              className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
             >
               Sign out
             </button>

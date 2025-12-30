@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lightbulb, X } from 'lucide-react';
+import { X } from 'lucide-react';
 
 interface HelpTipProps {
   message: string;
@@ -23,25 +23,22 @@ export const HelpTip: React.FC<HelpTipProps> = ({ message, action, autoClose = 5
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-20 left-4 right-4 md:bottom-6 md:left-6 md:right-auto md:max-w-sm bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-start gap-3 shadow-lg z-30 animate-in slide-in-from-bottom-4 fade-in duration-300">
-      <Lightbulb size={18} className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-      <div className="flex-1">
-        <p className="text-sm text-blue-900 dark:text-blue-200">{message}</p>
-        {action && (
-          <button
-            onClick={action.onClick}
-            className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline mt-1"
-          >
-            {action.label}
-          </button>
-        )}
-      </div>
+    <div className="fixed bottom-20 left-4 right-4 md:bottom-5 md:left-5 md:right-auto md:max-w-xs bg-slate-800 dark:bg-slate-700 text-white rounded-lg px-3 py-2 flex items-center gap-2 shadow-lg z-30 text-sm">
+      <span className="flex-1">{message}</span>
+      {action && (
+        <button
+          onClick={action.onClick}
+          className="text-blue-300 hover:text-blue-200 font-medium text-xs"
+        >
+          {action.label}
+        </button>
+      )}
       <button
         onClick={() => setIsVisible(false)}
-        className="flex-shrink-0 text-blue-400 dark:text-blue-500 hover:text-blue-600 dark:hover:text-blue-300 transition-colors"
+        className="text-slate-400 hover:text-white transition-colors p-0.5"
         aria-label="Close tip"
       >
-        <X size={16} />
+        <X size={14} />
       </button>
     </div>
   );

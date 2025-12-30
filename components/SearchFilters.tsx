@@ -1,10 +1,10 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { X, FileText, Mic, Music, Image } from 'lucide-react';
 
 interface FilterOption {
   id: string;
   label: string;
-  emoji: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
 }
 
 interface SearchFiltersProps {
@@ -13,10 +13,10 @@ interface SearchFiltersProps {
 }
 
 const FILTERS: FilterOption[] = [
-  { id: 'summary', label: 'Has Summary', emoji: '📋' },
-  { id: 'transcript', label: 'Has Transcript', emoji: '🎙️' },
-  { id: 'audio', label: 'Audio Notes', emoji: '🎵' },
-  { id: 'image', label: 'Image Notes', emoji: '📷' },
+  { id: 'summary', label: 'Summary', icon: FileText },
+  { id: 'transcript', label: 'Transcript', icon: Mic },
+  { id: 'audio', label: 'Audio', icon: Music },
+  { id: 'image', label: 'Image', icon: Image },
 ];
 
 export const SearchFilters: React.FC<SearchFiltersProps> = ({
@@ -32,24 +32,28 @@ export const SearchFilters: React.FC<SearchFiltersProps> = ({
   };
 
   return (
-    <div className="flex flex-wrap gap-2">
-      {FILTERS.map((filter) => (
-        <button
-          key={filter.id}
-          onClick={() => toggleFilter(filter.id)}
-          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-            selectedFilters.includes(filter.id)
-              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-          }`}
-        >
-          <span>{filter.emoji}</span>
-          <span>{filter.label}</span>
-          {selectedFilters.includes(filter.id) && (
-            <X size={14} className="ml-1" />
-          )}
-        </button>
-      ))}
+    <div className="flex flex-wrap gap-1.5">
+      {FILTERS.map((filter) => {
+        const Icon = filter.icon;
+        const isSelected = selectedFilters.includes(filter.id);
+        return (
+          <button
+            key={filter.id}
+            onClick={() => toggleFilter(filter.id)}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+              isSelected
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Icon size={12} />
+            <span>{filter.label}</span>
+            {isSelected && (
+              <X size={12} className="ml-0.5 opacity-60" />
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 };

@@ -285,26 +285,20 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
       />
 
       {/* Title Area */}
-      <div
-        className={`px-4 md:px-6 pt-6 pb-4 mx-auto ${
-          isFullWidth ? 'w-full md:px-8' : 'max-w-3xl'
-        }`}
-      >
+      <div className={`px-4 pt-4 pb-2 mx-auto ${isFullWidth ? 'w-full max-w-4xl' : 'max-w-2xl'}`}>
         <input
           value={localTitle}
           onChange={handleTitleChange}
           onFocus={() => setIsTitleFocused(true)}
           onBlur={() => setIsTitleFocused(false)}
-          className="text-2xl font-bold w-full outline-none text-slate-800 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 bg-transparent transition-colors"
+          className="text-lg font-semibold w-full outline-none text-slate-800 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 bg-transparent"
           placeholder="Untitled Note"
         />
-        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 flex items-center gap-1">
-          <Clock size={12} />
-          {new Date(activeNote.createdAt).toLocaleString()}
-        </p>
-
-        {/* Tags Manager */}
-        <div className="mt-4">
+        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+          <span className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1">
+            <Clock size={11} />
+            {new Date(activeNote.createdAt).toLocaleDateString()}
+          </span>
           <TagManager
             note={activeNote}
             updateNote={(id, updates) => notes.updateNote(id, updates)}
@@ -313,53 +307,45 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
       </div>
 
       {/* Content Tabs & Actions */}
-      <div
-        className={`flex flex-wrap items-end justify-between border-b border-slate-100 dark:border-slate-800 px-4 md:px-6 mt-4 mx-auto gap-4 ${
-          isFullWidth ? 'w-full md:px-8' : 'max-w-3xl'
-        } transition-colors`}
-      >
-        <div className="flex gap-6 overflow-x-auto no-scrollbar">
+      <div className={`flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-4 mx-auto ${isFullWidth ? 'w-full max-w-4xl' : 'max-w-2xl'}`}>
+        <div className="flex gap-1 overflow-x-auto no-scrollbar">
           {(['notes', 'files', 'transcript', 'summary'] as TabType[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`pb-3 px-2 text-sm font-medium transition-colors relative whitespace-nowrap capitalize ${
+              className={`px-3 py-2 text-xs font-medium transition-colors relative whitespace-nowrap capitalize rounded-t-lg ${
                 activeTab === tab
-                  ? 'text-blue-600 dark:text-blue-400'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  ? 'text-blue-600 dark:text-blue-400 bg-slate-50 dark:bg-slate-900'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
               }`}
             >
               {tab}
-              {activeTab === tab && (
-                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 dark:bg-blue-500 rounded-t-full"></div>
-              )}
             </button>
           ))}
         </div>
 
-        {/* Generate Summary Button */}
         <button
           onClick={handleGenerateSummary}
           disabled={activeNote.isProcessing}
-          className={`mb-2 px-3 py-2 md:px-4 border rounded-lg text-sm font-medium transition-all shadow-sm flex items-center gap-2 ${
+          className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
             activeNote.isProcessing
-              ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-400 dark:text-blue-300 cursor-not-allowed'
-              : 'bg-white dark:bg-slate-800 border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-300 active:scale-95'
+              ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-400 cursor-not-allowed'
+              : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 active:scale-95'
           }`}
         >
           {activeNote.isProcessing ? (
-            <Loader2 size={16} className="animate-spin" />
+            <Loader2 size={12} className="animate-spin" />
           ) : (
-            <Sparkles size={16} />
+            <Sparkles size={12} />
           )}
           <span className="hidden sm:inline">
-            {activeNote.isProcessing ? 'Generating...' : 'Generate Summary'}
+            {activeNote.isProcessing ? 'Processing' : 'Summarize'}
           </span>
         </button>
       </div>
 
       {/* Editor Content */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/50 dark:bg-slate-900/50 pb-20 transition-colors">
+      <div className="flex-1 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-900/50 pb-16">
         {activeTab === 'notes' && (
           <NoteTab
             note={activeNote}

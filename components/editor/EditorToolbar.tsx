@@ -5,10 +5,6 @@ import {
   Mic,
   StopCircle,
   MessageSquare,
-  Moon,
-  Sun,
-  Minimize2,
-  Maximize2,
   Trash2,
   Download,
   HardDrive,
@@ -59,287 +55,206 @@ export const EditorToolbar = React.memo<EditorToolbarProps>(({
   driveError,
   onClearDriveError,
 }) => {
-  const { notes, chat, recording, theme, processing } = useNotesContext();
+  const { notes, chat, recording, processing } = useNotesContext();
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDriveSuccess, setShowDriveSuccess] = useState(false);
 
   if (!notes.activeNote) return null;
 
-  // Show success notification when save completes
   useEffect(() => {
     if (saveStatus === 'success' && driveFileId) {
       setShowDriveSuccess(true);
-      const timer = setTimeout(() => {
-        setShowDriveSuccess(false);
-      }, 5000);
+      const timer = setTimeout(() => setShowDriveSuccess(false), 4000);
       return () => clearTimeout(timer);
     }
   }, [saveStatus, driveFileId]);
 
-  const handleDeleteClick = () => {
-    setShowDeleteConfirm(true);
-  };
+  const handleDeleteClick = () => setShowDeleteConfirm(true);
 
   const handleDeleteConfirm = () => {
     notes.deleteNote(notes.activeNote!.id);
     setShowDeleteConfirm(false);
-    onBack(); // Navigate back to dashboard after deletion
-  };
-
-  const handleDeleteCancel = () => {
-    setShowDeleteConfirm(false);
-    // Stay on the note page
+    onBack();
   };
 
   const handleViewInDrive = () => {
-    if (driveFileId) {
-      window.open(getDriveFileUrl(driveFileId), '_blank');
-    }
+    if (driveFileId) window.open(getDriveFileUrl(driveFileId), '_blank');
   };
 
   return (
     <>
-      {/* Error Notification */}
+      {/* Notifications */}
       {driveError && (
-        <div className="fixed top-4 right-4 z-50 max-w-md bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg shadow-lg p-4 flex items-start gap-3 animate-in slide-in-from-top">
-          <AlertTriangle size={20} className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm text-red-800 dark:text-red-200">{driveError}</p>
-          </div>
-          <button
-            onClick={onClearDriveError}
-            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 transition-colors"
-          >
-            <X size={18} />
+        <div className="fixed top-3 right-3 z-50 max-w-sm bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg shadow-lg p-3 flex items-start gap-2">
+          <AlertTriangle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-700 dark:text-red-200 flex-1">{driveError}</p>
+          <button onClick={onClearDriveError} className="text-red-400 hover:text-red-600">
+            <X size={14} />
           </button>
         </div>
       )}
 
-      {/* Success Notification */}
       {showDriveSuccess && driveFileId && (
-        <div className="fixed top-4 right-4 z-50 max-w-md bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg shadow-lg p-4 flex items-start gap-3 animate-in slide-in-from-top">
-          <Check size={20} className="text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+        <div className="fixed top-3 right-3 z-50 max-w-sm bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg shadow-lg p-3 flex items-start gap-2">
+          <Check size={16} className="text-green-500 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-green-800 dark:text-green-200 mb-1">
-              Saved to Google Drive!
-            </p>
+            <p className="text-sm font-medium text-green-700 dark:text-green-200">Saved to Drive</p>
             <button
               onClick={handleViewInDrive}
-              className="text-sm text-green-700 dark:text-green-300 hover:text-green-900 dark:hover:text-green-100 flex items-center gap-1 underline"
+              className="text-xs text-green-600 dark:text-green-300 flex items-center gap-1 hover:underline"
             >
-              View in Drive <ExternalLink size={14} />
+              Open <ExternalLink size={10} />
             </button>
           </div>
-          <button
-            onClick={() => setShowDriveSuccess(false)}
-            className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200 transition-colors"
-          >
-            <X size={18} />
+          <button onClick={() => setShowDriveSuccess(false)} className="text-green-400 hover:text-green-600">
+            <X size={14} />
           </button>
         </div>
       )}
 
-      <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 sticky top-0 z-10 transition-colors">
-        <div className="flex items-center gap-2">
-        <button
-          onClick={onBack}
-          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-600 dark:text-slate-400 transition-colors"
-          aria-label={ARIA_LABELS.BACK_TO_DASHBOARD}
-        >
-          <ArrowLeft size={20} />
-        </button>
-
-        {/* AI Action Buttons */}
-        <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-full p-1 ml-2 transition-colors">
-          <label
-            className="p-2 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-700 rounded-full transition-colors cursor-pointer"
-            title={ARIA_LABELS.UPLOAD_IMAGE}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 sticky top-0 z-10">
+        {/* Left side - Back and actions */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 dark:text-slate-400 transition-colors"
+            aria-label={ARIA_LABELS.BACK_TO_DASHBOARD}
           >
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={onImageUpload}
-            />
-            <ImageIcon size={18} />
+            <ArrowLeft size={18} />
+          </button>
+
+          <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-1" />
+
+          <label
+            className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+            title="Upload image"
+          >
+            <input type="file" accept="image/*" multiple className="hidden" onChange={onImageUpload} />
+            <ImageIcon size={16} />
           </label>
           <button
             onClick={recording.isRecording ? recording.stopRecording : onStartRecording}
-            className={`p-2 rounded-full transition-colors ${
+            className={`p-2 rounded-lg transition-colors ${
               recording.isRecording
-                ? 'text-red-600 bg-red-100 dark:bg-red-900/30 animate-pulse'
-                : 'text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-white dark:hover:bg-slate-700'
+                ? 'text-red-500 bg-red-50 dark:bg-red-900/20'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
-            title={
-              recording.isRecording
-                ? ARIA_LABELS.STOP_RECORDING
-                : ARIA_LABELS.START_RECORDING
-            }
-            aria-label={
-              recording.isRecording
-                ? ARIA_LABELS.STOP_RECORDING
-                : ARIA_LABELS.START_RECORDING
-            }
+            title={recording.isRecording ? 'Stop' : 'Record'}
           >
-            {recording.isRecording ? <StopCircle size={18} /> : <Mic size={18} />}
+            {recording.isRecording ? <StopCircle size={16} /> : <Mic size={16} />}
           </button>
           <button
             onClick={() => chat.setIsChatOpen(true)}
-            className="p-2 text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-white dark:hover:bg-slate-700 rounded-full transition-colors"
-            title="Ask AI"
+            className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            title="AI Assistant"
           >
-            <MessageSquare size={18} />
+            <MessageSquare size={16} />
           </button>
         </div>
 
-        {/* Dark Mode Toggle */}
-        <button
-          onClick={theme.toggleTheme}
-          className="ml-2 p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors hidden sm:block"
-          aria-label={ARIA_LABELS.TOGGLE_THEME}
-        >
-          {theme.darkMode ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
-      </div>
+        {/* Right side - Save actions */}
+        <div className="flex items-center gap-0.5">
+          {processing.processingStatus.step === 'transcribing' && (
+            <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 mr-2 rounded bg-blue-50 dark:bg-blue-900/20 text-xs text-blue-600 dark:text-blue-400">
+              <Loader2 className="animate-spin" size={12} />
+              <span>Transcribing...</span>
+            </div>
+          )}
 
-      <div className="flex gap-2 relative">
-        <button
-          onClick={onToggleWidth}
-          className="hidden md:flex items-center gap-2 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-sm transition-colors"
-          title="Fit to screen"
-        >
-          {isFullWidth ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-        </button>
-        <button
-          type="button"
-          onClick={handleDeleteClick}
-          className="p-2 text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
-          title={ARIA_LABELS.DELETE_NOTE}
-          aria-label={ARIA_LABELS.DELETE_NOTE}
-        >
-          <Trash2 size={20} />
-        </button>
-
-        {/* Download Dropdown */}
-        <div className="relative">
           <button
-            onClick={() => setShowDownloadMenu(!showDownloadMenu)}
-            className="p-2 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors"
-            title={ARIA_LABELS.DOWNLOAD}
-            aria-label={ARIA_LABELS.DOWNLOAD}
+            onClick={handleDeleteClick}
+            className="p-2 text-slate-500 dark:text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+            title="Delete"
           >
-            <Download size={20} />
+            <Trash2 size={16} />
           </button>
-          {showDownloadMenu && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setShowDownloadMenu(false)}
-              ></div>
-              <div className="absolute top-full right-0 mt-2 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-2 min-w-[160px] z-20 flex flex-col">
-                <button
-                  onClick={onDownloadMarkdown}
-                  className="px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors"
-                >
-                  <FileText size={16} className="text-slate-400" /> Markdown (.md)
-                </button>
-                <button
-                  onClick={onDownloadPDF}
-                  className="px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors"
-                >
-                  <FileIcon size={16} className="text-slate-400" /> PDF (.pdf)
-                </button>
-              </div>
-            </>
-          )}
+
+          <div className="relative">
+            <button
+              onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+              className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              title="Download"
+            >
+              <Download size={16} />
+            </button>
+            {showDownloadMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowDownloadMenu(false)} />
+                <div className="absolute top-full right-0 mt-1 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 min-w-[140px] z-20">
+                  <button
+                    onClick={() => { onDownloadMarkdown(); setShowDownloadMenu(false); }}
+                    className="w-full px-3 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
+                  >
+                    <FileText size={14} className="text-slate-400" /> Markdown
+                  </button>
+                  <button
+                    onClick={() => { onDownloadPDF(); setShowDownloadMenu(false); }}
+                    className="w-full px-3 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
+                  >
+                    <FileIcon size={14} className="text-slate-400" /> PDF
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          <button
+            onClick={onShare}
+            className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            title="Share"
+          >
+            <Share2 size={16} />
+          </button>
+
+          <button
+            onClick={onSaveToDrive}
+            disabled={saveStatus !== 'idle'}
+            title={driveFileId ? 'Update in Drive' : 'Save to Drive'}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 ml-1 rounded-lg text-xs font-medium transition-all ${
+              saveStatus === 'success'
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                : saveStatus === 'saving'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            {saveStatus === 'saving' ? (
+              <Loader2 className="animate-spin" size={14} />
+            ) : saveStatus === 'success' ? (
+              <Check size={14} />
+            ) : (
+              <HardDrive size={14} />
+            )}
+            <span className="hidden sm:inline">
+              {saveStatus === 'saving' ? 'Saving' : saveStatus === 'success' ? 'Saved' : driveFileId ? 'Update' : 'Save'}
+            </span>
+          </button>
         </div>
-
-        <button
-          id="drive-btn"
-          onClick={onSaveToDrive}
-          disabled={saveStatus !== 'idle'}
-          title={driveFileId ? 'Update file in Google Drive' : 'Save to Google Drive'}
-          className={`flex items-center gap-2 px-3 py-2 md:px-4 border rounded-full text-sm font-medium transition-all ${
-            saveStatus === 'success'
-              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
-              : saveStatus === 'saving'
-              ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400'
-              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
-          }`}
-        >
-          {saveStatus === 'saving' ? (
-            <Loader2 className="animate-spin" size={16} />
-          ) : saveStatus === 'success' ? (
-            <Check size={16} />
-          ) : (
-            <HardDrive size={16} />
-          )}
-          <span className="hidden sm:inline">
-            {saveStatus === 'saving'
-              ? 'Saving...'
-              : saveStatus === 'success'
-              ? 'Saved'
-              : driveFileId
-              ? 'Update'
-              : 'Save'}
-          </span>
-        </button>
-        <button
-          onClick={onShare}
-          className="p-2 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors"
-          aria-label={ARIA_LABELS.SHARE}
-        >
-          <Share2 size={20} />
-        </button>
-
-        {processing.processingStatus.step === 'transcribing' && (
-          <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-xs font-medium text-blue-700 dark:text-blue-300">
-            <Loader2 className="animate-spin" size={14} />
-            <span>Transcribing audio in background…</span>
-          </div>
-        )}
       </div>
 
-        {/* Delete Confirmation Modal */}
-        <Modal
-          isOpen={showDeleteConfirm}
-          onClose={handleDeleteCancel}
-          title="Delete Note"
-          size="sm"
-          closeOnOverlayClick={false}
-        >
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                <AlertTriangle size={20} className="text-red-600 dark:text-red-400" />
-              </div>
-              <div className="flex-1">
-                <p className="text-slate-700 dark:text-slate-300">
-                  Are you sure you want to delete this note? This action cannot be undone.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-3 justify-end pt-2">
-              <Button
-                variant="secondary"
-                onClick={handleDeleteCancel}
-                className="px-4"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                onClick={handleDeleteConfirm}
-                className="px-4"
-              >
-                Delete
-              </Button>
-            </div>
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        title="Delete Note"
+        size="sm"
+        closeOnOverlayClick={false}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Delete this note? This cannot be undone.
+          </p>
+          <div className="flex gap-2 justify-end">
+            <Button variant="secondary" size="sm" onClick={() => setShowDeleteConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" size="sm" onClick={handleDeleteConfirm}>
+              Delete
+            </Button>
           </div>
-        </Modal>
-      </div>
+        </div>
+      </Modal>
     </>
   );
 });

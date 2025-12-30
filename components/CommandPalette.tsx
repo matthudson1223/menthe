@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Zap, Plus, Lightbulb } from 'lucide-react';
+import { Search } from 'lucide-react';
 
 interface Command {
   id: string;
@@ -27,8 +27,7 @@ export const CommandPalette: React.FC<Props> = ({ isOpen, onClose, commands }) =
     const query = search.toLowerCase();
     return commands.filter(cmd =>
       cmd.label.toLowerCase().includes(query) ||
-      cmd.description.toLowerCase().includes(query) ||
-      cmd.category.toLowerCase().includes(query)
+      cmd.description.toLowerCase().includes(query)
     );
   }, [search, commands]);
 
@@ -43,7 +42,6 @@ export const CommandPalette: React.FC<Props> = ({ isOpen, onClose, commands }) =
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
-
       switch (e.key) {
         case 'Escape':
           onClose();
@@ -65,7 +63,6 @@ export const CommandPalette: React.FC<Props> = ({ isOpen, onClose, commands }) =
           break;
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, filtered, selectedIndex, onClose]);
@@ -74,74 +71,55 @@ export const CommandPalette: React.FC<Props> = ({ isOpen, onClose, commands }) =
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-16 p-4"
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-start justify-center pt-24 p-4"
       onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="command-palette-title"
     >
       <div
-        className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden"
+        className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-800"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-800">
-          <Search size={20} className="text-slate-400 dark:text-slate-500 flex-shrink-0" />
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 dark:border-slate-800">
+          <Search size={16} className="text-slate-400 flex-shrink-0" />
           <input
             ref={inputRef}
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setSelectedIndex(0);
-            }}
+            onChange={(e) => { setSearch(e.target.value); setSelectedIndex(0); }}
             placeholder="Search commands..."
-            className="flex-1 bg-transparent outline-none text-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
+            className="flex-1 bg-transparent outline-none text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400"
             autoComplete="off"
-            id="command-palette-title"
           />
         </div>
 
-        <div className="max-h-96 overflow-y-auto">
+        <div className="max-h-64 overflow-y-auto py-1">
           {filtered.length === 0 ? (
-            <div className="p-8 text-center text-slate-500 dark:text-slate-400">
-              <Lightbulb size={32} className="mx-auto mb-2 opacity-50" />
-              <p>No commands found</p>
+            <div className="p-4 text-center text-sm text-slate-400">
+              No commands found
             </div>
           ) : (
-            <div className="py-2">
-              {filtered.map((command, index) => (
-                <button
-                  key={command.id}
-                  onClick={() => {
-                    command.action();
-                    onClose();
-                  }}
-                  className={`w-full px-4 py-3 flex items-center justify-between transition-colors ${
-                    selectedIndex === index
-                      ? 'bg-blue-50 dark:bg-blue-900/20'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 flex-1 text-left">
-                    <div className="text-slate-600 dark:text-slate-400 flex-shrink-0">
-                      {command.icon}
-                    </div>
-                    <div>
-                      <p className="font-medium text-slate-900 dark:text-slate-100">
-                        {command.label}
-                      </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {command.description}
-                      </p>
-                    </div>
+            filtered.map((cmd, index) => (
+              <button
+                key={cmd.id}
+                onClick={() => { cmd.action(); onClose(); }}
+                className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${
+                  selectedIndex === index
+                    ? 'bg-blue-50 dark:bg-blue-900/20'
+                    : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 dark:text-slate-400">{cmd.icon}</span>
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{cmd.label}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{cmd.description}</p>
                   </div>
-                  {command.shortcut && (
-                    <kbd className="ml-2 px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded text-xs font-mono flex-shrink-0">
-                      {command.shortcut}
-                    </kbd>
-                  )}
-                </button>
-              ))}
-            </div>
+                </div>
+                {cmd.shortcut && (
+                  <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded text-xs">
+                    {cmd.shortcut}
+                  </kbd>
+                )}
+              </button>
+            ))
           )}
         </div>
       </div>
