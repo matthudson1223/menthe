@@ -5,6 +5,7 @@ import {
   Underline as UnderlineIcon,
   List,
   ListOrdered,
+  ListTodo,
   Undo2,
   Redo2,
   ChevronDown
@@ -182,6 +183,13 @@ export const RichTextToolbar = React.memo<RichTextToolbarProps>(({ editor }) => 
           active={editor.isActive('orderedList')}
           disabled={!editor.can().chain().focus().toggleOrderedList().run()}
           title="Numbered List"
+        />
+        <ToolbarButton
+          icon={ListTodo}
+          onClick={() => editor.chain().focus().toggleTaskList().run()}
+          active={editor.isActive('taskList')}
+          disabled={!editor.can().chain().focus().toggleTaskList().run()}
+          title="Task List"
         />
       </div>
 

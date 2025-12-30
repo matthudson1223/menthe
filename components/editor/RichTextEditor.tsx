@@ -4,6 +4,8 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
 import CharacterCount from '@tiptap/extension-character-count';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
 import { parseContent } from '../../utils/tiptapHelpers';
 import { debounce } from '../../utils/helpers';
 
@@ -33,7 +35,11 @@ export const RichTextEditor = React.memo<RichTextEditorProps>(
         Placeholder.configure({
           placeholder
         }),
-        CharacterCount
+        CharacterCount,
+        TaskList,
+        TaskItem.configure({
+          nested: true,
+        })
       ],
       content: parseContent(content),
       editorProps: {
