@@ -125,12 +125,23 @@ export const Dashboard = React.memo<DashboardProps>(({
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pb-24">
-      <header className="sticky top-0 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm z-10 py-3 mb-4 transition-colors">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <SideMenu selectedGroup={selectedGroup} onGroupSelect={setSelectedGroup} />
-            <div>
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-950">
+      {/* Sidebar - hidden on mobile, visible on desktop */}
+      <div className="hidden lg:block lg:flex-shrink-0">
+        <SideMenu selectedGroup={selectedGroup} onGroupSelect={setSelectedGroup} />
+      </div>
+
+      {/* Main content area */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto px-4 pb-24">
+          <header className="sticky top-0 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm z-10 py-3 mb-4 transition-colors">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {/* Mobile hamburger menu */}
+                <div className="lg:hidden">
+                  <SideMenu selectedGroup={selectedGroup} onGroupSelect={setSelectedGroup} />
+                </div>
+                <div>
               <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
                 {APP_CONFIG.APP_NAME}
               </h1>
@@ -294,6 +305,8 @@ export const Dashboard = React.memo<DashboardProps>(({
         onClose={() => setShowCommandPalette(false)}
         commands={commands}
       />
+        </div>
+      </div>
     </div>
   );
 });

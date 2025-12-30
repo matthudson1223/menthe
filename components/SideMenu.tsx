@@ -65,7 +65,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       )}
 
       <div
-        className={`fixed top-0 left-0 h-full w-64 bg-white dark:bg-slate-900 shadow-xl z-50 transform transition-transform duration-200 ease-out flex flex-col border-r border-slate-200 dark:border-slate-800 ${
+        className={`fixed top-0 left-0 h-full w-64 bg-white dark:bg-slate-900 shadow-xl z-50 transform transition-transform duration-200 ease-out flex flex-col border-r border-slate-200 dark:border-slate-800 lg:relative lg:translate-x-0 lg:shadow-none lg:z-auto ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
