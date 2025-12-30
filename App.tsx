@@ -10,6 +10,7 @@ import { Editor } from './components/editor';
 import { ChatPanel } from './components/ChatPanel';
 import { RecordingStatusBar } from './components/RecordingStatusBar';
 import { AuthScreen } from './components/AuthScreen';
+import { HelpTip } from './components/HelpTip';
 import { useKeyboardShortcuts, useAutoTitle } from './hooks';
 import { MESSAGES } from './constants';
 import * as geminiService from './services/geminiService';
@@ -21,6 +22,10 @@ function AppContent() {
   const { showError } = useErrorHandler();
   const [view, setView] = useState<ViewType>('dashboard');
   const [activeTab, setActiveTab] = useState<TabType>('notes');
+  const [showFirstTimeHint, setShowFirstTimeHint] = useState(() => {
+    // Show hint only if user has no notes
+    return true;
+  });
 
   // Auto-title generation
   useAutoTitle(notes.activeNote, processing.generateTitle);
@@ -145,6 +150,14 @@ function AppContent() {
       <ChatPanel />
 
       <RecordingStatusBar onStopRecording={recording.stopRecording} />
+
+      {showFirstTimeHint && notes.notes.length === 0 && view === 'dashboard' && (
+        <HelpTip
+          message="Press ⌘N to create your first note, or press ⌘K for quick actions!"
+          action={{ label: "Got it", onClick: () => setShowFirstTimeHint(false) }}
+          autoClose={8000}
+        />
+      )}
 
       <button
         type="button"

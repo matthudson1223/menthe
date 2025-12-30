@@ -102,11 +102,26 @@ export const NoteCard: React.FC<Props> = ({ note, onClick, onDelete }) => {
     setOffset(0);
   };
 
+  const getPreviewText = () => {
+    if (note.summaryText) return note.summaryText;
+    if (note.verbatimText) return note.verbatimText;
+    if (note.userNotes) return note.userNotes;
+    return "No content yet...";
+  };
+
+  const getContentType = () => {
+    const types = [];
+    if (note.summaryText) types.push('Summary');
+    if (note.verbatimText) types.push('Transcript');
+    if (note.userNotes) types.push('Notes');
+    return types.length > 0 ? types.join(', ') : 'Empty';
+  };
+
   return (
     <div className="relative w-full overflow-hidden rounded-xl mb-3 select-none group/card">
       {/* Background Action Layer */}
       <div className="absolute inset-0 flex items-center justify-end bg-red-500 rounded-xl pr-6">
-        <button 
+        <button
           onClick={handleDeleteClick}
           className="text-white p-2 flex flex-col items-center justify-center hover:scale-110 transition-transform active:scale-95"
           aria-label="Delete note"
@@ -116,9 +131,9 @@ export const NoteCard: React.FC<Props> = ({ note, onClick, onDelete }) => {
       </div>
 
       {/* Foreground Content Layer */}
-      <div 
+      <div
         ref={cardRef}
-        className="relative bg-white dark:bg-slate-900 z-10 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 touch-pan-y transition-colors"
+        className="relative bg-white dark:bg-slate-900 z-10 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 touch-pan-y transition-all hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700"
         style={{ transform: `translateX(${offset}px)` }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -128,23 +143,48 @@ export const NoteCard: React.FC<Props> = ({ note, onClick, onDelete }) => {
         onMouseUp={handleTouchEnd}
         onMouseLeave={handleTouchEnd}
       >
-        <button 
+        <button
           onClick={handleContentClick}
           className="w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group outline-none"
         >
-          <div className="flex items-start justify-between mb-2 pointer-events-none">
-            <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 transition-colors">
+          <div className="flex items-start justify-between mb-3 pointer-events-none">
+            <div className={`p-2.5 rounded-lg transition-colors ${
+              note.type === 'audio'
+                ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
+                : note.type === 'image'
+                ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400'
+                : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+            } group-hover:scale-110 transition-transform`}>
               <Icon size={20} />
             </div>
-            <span className="text-xs text-slate-400 dark:text-slate-500 flex items-center">
-                <Calendar size={12} className="mr-1" />
-                {new Date(note.createdAt).toLocaleDateString()}
-            </span>
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-xs text-slate-400 dark:text-slate-500 flex items-center">
+                  <Calendar size={12} className="mr-1" />
+                  {new Date(note.createdAt).toLocaleDateString()}
+              </span>
+              <span className="text-xs px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-full font-medium">
+                {getContentType()}
+              </span>
+            </div>
           </div>
-          <h3 className="font-semibold text-slate-800 dark:text-slate-200 line-clamp-1 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors pointer-events-none">{note.title}</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 pointer-events-none min-h-[1.25rem]">
-            {note.summaryText || note.verbatimText || note.userNotes || "No content yet..."}
+          <h3 className="font-semibold text-slate-900 dark:text-slate-100 line-clamp-1 mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors pointer-events-none text-base">{note.title}</h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 pointer-events-none min-h-[1.5rem] leading-relaxed">
+            {getPreviewText()}
           </p>
+          {note.tags && note.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-3 pointer-events-none">
+              {note.tags.slice(0, 3).map((tag, idx) => (
+                <span key={idx} className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded font-medium">
+                  #{tag}
+                </span>
+              ))}
+              {note.tags.length > 3 && (
+                <span className="text-xs text-slate-500 dark:text-slate-400 px-1">
+                  +{note.tags.length - 3} more
+                </span>
+              )}
+            </div>
+          )}
         </button>
       </div>
     </div>

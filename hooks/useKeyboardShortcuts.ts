@@ -6,6 +6,8 @@ interface KeyboardShortcutHandlers {
   onSearch?: () => void;
   onToggleTheme?: () => void;
   onSave?: () => void;
+  onOpenCommandPalette?: () => void;
+  onShowShortcuts?: () => void;
 }
 
 /**
@@ -53,6 +55,18 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers) {
       if (isMod && event.key === KEYBOARD_SHORTCUTS.TOGGLE_THEME) {
         event.preventDefault();
         handlers.onToggleTheme?.();
+      }
+
+      // Cmd/Ctrl + K: Open command palette
+      if (isMod && event.key === 'k') {
+        event.preventDefault();
+        handlers.onOpenCommandPalette?.();
+      }
+
+      // ?: Show shortcuts
+      if (event.key === '?' && !isMod) {
+        event.preventDefault();
+        handlers.onShowShortcuts?.();
       }
     };
 

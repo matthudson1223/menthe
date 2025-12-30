@@ -24,7 +24,7 @@
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "firebase": "^11.10.0",
-    "html2pdf.js": "0.10.1",
+    "html2pdf.js": "^0.10.3",
     "localforage": "^1.10.0",
     "lucide-react": "^0.555.0",
     "react": "^19.2.1",
