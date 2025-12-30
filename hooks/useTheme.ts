@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { storageService } from '../services/storageService';
 import { UseThemeReturn } from '../types';
 
@@ -7,24 +7,40 @@ import { UseThemeReturn } from '../types';
  */
 export function useTheme(): UseThemeReturn {
   const [darkMode, setDarkMode] = useState<boolean>(() => {
-    const saved = storageService.getTheme();
-    if (saved) return saved === 'dark';
+    // Start with system preference, then load saved preference async
     return storageService.getSystemTheme() === 'dark';
   });
+  const [initialized, setInitialized] = useState(false);
 
+  // Load saved theme preference on mount
+  useEffect(() => {
+    const loadTheme = async () => {
+      const saved = await storageService.getTheme();
+      if (saved) {
+        setDarkMode(saved === 'dark');
+      }
+      setInitialized(true);
+    };
+    loadTheme();
+  }, []);
+
+  // Apply theme to document and persist
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark');
-      storageService.saveTheme('dark');
     } else {
       document.documentElement.classList.remove('dark');
-      storageService.saveTheme('light');
     }
-  }, [darkMode]);
 
-  const toggleTheme = () => {
+    // Only persist after initial load to avoid overwriting saved preference
+    if (initialized) {
+      storageService.saveTheme(darkMode ? 'dark' : 'light');
+    }
+  }, [darkMode, initialized]);
+
+  const toggleTheme = useCallback(() => {
     setDarkMode(prev => !prev);
-  };
+  }, []);
 
   return { darkMode, toggleTheme };
 }
