@@ -8,41 +8,59 @@ import { MESSAGES } from '../constants';
 export function useRecording(): UseRecordingReturn {
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
   const onStopCallbackRef = useRef<((dataUrl: string, base64: string) => void) | null>(null);
+  const stopPromiseRef = useRef<Promise<void> | null>(null);
 
   const startRecording = useCallback(async (
     onStop: (dataUrl: string, base64: string) => void
   ) => {
+    // Wait for any previous recording to fully stop before starting a new one
+    if (stopPromiseRef.current) {
+      await stopPromiseRef.current;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
 
-      chunksRef.current = [];
+      // Create a new chunks array for this recording session
+      const chunks: Blob[] = [];
       onStopCallbackRef.current = onStop;
 
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
-          chunksRef.current.push(e.data);
+          chunks.push(e.data);
         }
       };
 
-      recorder.onstop = async () => {
-        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        const reader = new FileReader();
+      // Create a promise that resolves when the recording fully stops
+      stopPromiseRef.current = new Promise<void>((resolve) => {
+        recorder.onstop = async () => {
+          try {
+            const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+            const reader = new FileReader();
 
-        reader.onloadend = () => {
-          const dataUrl = reader.result as string;
-          const base64Data = dataUrl.split(',')[1];
+            reader.onloadend = () => {
+              const dataUrl = reader.result as string;
+              const base64Data = dataUrl.split(',')[1];
 
-          if (onStopCallbackRef.current) {
-            onStopCallbackRef.current(dataUrl, base64Data);
+              if (onStopCallbackRef.current) {
+                onStopCallbackRef.current(dataUrl, base64Data);
+              }
+              resolve();
+            };
+
+            reader.onerror = () => {
+              console.error('Error reading audio blob');
+              resolve();
+            };
+
+            reader.readAsDataURL(audioBlob);
+          } finally {
+            stream.getTracks().forEach(track => track.stop());
           }
         };
-
-        reader.readAsDataURL(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
-      };
+      });
 
       recorder.start();
       mediaRecorderRef.current = recorder;

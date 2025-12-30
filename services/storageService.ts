@@ -1,46 +1,46 @@
+import localforage from 'localforage';
 import { Note } from '../types';
 import { STORAGE_KEYS, APP_CONFIG } from '../constants';
 
+// Configure localforage to use IndexedDB
+localforage.config({
+  name: APP_CONFIG.APP_NAME,
+  storeName: 'menthe_store',
+  driver: [localforage.INDEXEDDB, localforage.WEBSQL, localforage.LOCALSTORAGE],
+});
+
 /**
  * Storage Service
- * Handles all localStorage operations with error handling and migrations
+ * Handles all IndexedDB operations via localforage with error handling and migrations
  */
 class StorageService {
-  private storageAvailable: boolean;
+  private initialized: Promise<void>;
 
   constructor() {
-    this.storageAvailable = this.checkStorageAvailability();
-    if (this.storageAvailable) {
-      this.runMigrations();
-    }
+    this.initialized = this.initialize();
   }
 
   /**
-   * Check if localStorage is available
+   * Initialize storage and run migrations
    */
-  private checkStorageAvailability(): boolean {
+  private async initialize(): Promise<void> {
     try {
-      const test = '__storage_test__';
-      localStorage.setItem(test, test);
-      localStorage.removeItem(test);
-      return true;
+      await this.runMigrations();
     } catch (e) {
-      console.warn('localStorage is not available:', e);
-      return false;
+      console.error('Storage initialization failed:', e);
     }
   }
 
   /**
    * Run migrations if needed
    */
-  private runMigrations(): void {
+  private async runMigrations(): Promise<void> {
     try {
-      const currentVersion = this.getItem<number>(STORAGE_KEYS.STORAGE_VERSION) || 0;
+      const currentVersion = await this.getItem<number>(STORAGE_KEYS.STORAGE_VERSION) || 0;
 
       if (currentVersion < APP_CONFIG.STORAGE_VERSION) {
-        // Run migrations here
-        this.migrateV0ToV1();
-        this.setItem(STORAGE_KEYS.STORAGE_VERSION, APP_CONFIG.STORAGE_VERSION);
+        await this.migrateV0ToV1();
+        await this.setItem(STORAGE_KEYS.STORAGE_VERSION, APP_CONFIG.STORAGE_VERSION);
       }
     } catch (e) {
       console.error('Migration failed:', e);
@@ -50,15 +50,26 @@ class StorageService {
   /**
    * Migrate from version 0 to version 1
    */
-  private migrateV0ToV1(): void {
+  private async migrateV0ToV1(): Promise<void> {
     try {
-      const notes = this.getNotes();
-      // Reset processing state for all notes (in case they were stuck)
-      const migratedNotes = notes.map(note => ({
-        ...note,
-        isProcessing: false,
-      }));
-      this.saveNotes(migratedNotes);
+      // Migrate data from localStorage to IndexedDB if present
+      const oldNotes = localStorage.getItem(STORAGE_KEYS.NOTES);
+      if (oldNotes) {
+        const notes = JSON.parse(oldNotes) as Note[];
+        const migratedNotes = notes.map(note => ({
+          ...note,
+          isProcessing: false,
+        }));
+        await this.saveNotes(migratedNotes);
+        localStorage.removeItem(STORAGE_KEYS.NOTES);
+      }
+
+      const oldTheme = localStorage.getItem(STORAGE_KEYS.THEME);
+      if (oldTheme) {
+        const theme = JSON.parse(oldTheme) as 'light' | 'dark';
+        await this.saveTheme(theme);
+        localStorage.removeItem(STORAGE_KEYS.THEME);
+      }
     } catch (e) {
       console.error('V0 to V1 migration failed:', e);
     }
@@ -67,12 +78,9 @@ class StorageService {
   /**
    * Generic get item from storage
    */
-  private getItem<T>(key: string): T | null {
-    if (!this.storageAvailable) return null;
-
+  private async getItem<T>(key: string): Promise<T | null> {
     try {
-      const item = localStorage.getItem(key);
-      return item ? JSON.parse(item) : null;
+      return await localforage.getItem<T>(key);
     } catch (e) {
       console.error(`Error getting item ${key} from storage:`, e);
       return null;
@@ -82,19 +90,12 @@ class StorageService {
   /**
    * Generic set item to storage
    */
-  private setItem<T>(key: string, value: T): boolean {
-    if (!this.storageAvailable) return false;
-
+  private async setItem<T>(key: string, value: T): Promise<boolean> {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      await localforage.setItem(key, value);
       return true;
     } catch (e) {
-      if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-        console.error('Storage quota exceeded');
-        // TODO: Implement cleanup strategy
-      } else {
-        console.error(`Error setting item ${key} to storage:`, e);
-      }
+      console.error(`Error setting item ${key} to storage:`, e);
       return false;
     }
   }
@@ -102,47 +103,49 @@ class StorageService {
   /**
    * Remove item from storage
    */
-  private removeItem(key: string): void {
-    if (!this.storageAvailable) return;
-
+  private async removeItem(key: string): Promise<void> {
     try {
-      localStorage.removeItem(key);
+      await localforage.removeItem(key);
     } catch (e) {
       console.error(`Error removing item ${key} from storage:`, e);
     }
   }
 
   /**
-   * Get all notes from storage
+   * Get all notes from storage (async)
    */
-  getNotes(): Note[] {
-    const notes = this.getItem<Note[]>(STORAGE_KEYS.NOTES);
+  async getNotes(): Promise<Note[]> {
+    await this.initialized;
+    const notes = await this.getItem<Note[]>(STORAGE_KEYS.NOTES);
     return notes || [];
   }
 
   /**
-   * Save notes to storage
+   * Save notes to storage (async)
    */
-  saveNotes(notes: Note[]): boolean {
+  async saveNotes(notes: Note[]): Promise<boolean> {
+    await this.initialized;
     return this.setItem(STORAGE_KEYS.NOTES, notes);
   }
 
   /**
-   * Get theme from storage
+   * Get theme from storage (async)
    */
-  getTheme(): 'light' | 'dark' | null {
+  async getTheme(): Promise<'light' | 'dark' | null> {
+    await this.initialized;
     return this.getItem<'light' | 'dark'>(STORAGE_KEYS.THEME);
   }
 
   /**
-   * Save theme to storage
+   * Save theme to storage (async)
    */
-  saveTheme(theme: 'light' | 'dark'): boolean {
+  async saveTheme(theme: 'light' | 'dark'): Promise<boolean> {
+    await this.initialized;
     return this.setItem(STORAGE_KEYS.THEME, theme);
   }
 
   /**
-   * Get system theme preference
+   * Get system theme preference (sync - doesn't require storage)
    */
   getSystemTheme(): 'light' | 'dark' {
     if (typeof window === 'undefined') return 'light';
@@ -152,23 +155,22 @@ class StorageService {
   /**
    * Clear all storage (useful for debugging or reset)
    */
-  clearAll(): void {
-    if (!this.storageAvailable) return;
-
+  async clearAll(): Promise<void> {
     try {
-      localStorage.clear();
+      await localforage.clear();
     } catch (e) {
       console.error('Error clearing storage:', e);
     }
   }
 
   /**
-   * Export all data as JSON
+   * Export all data as JSON (async)
    */
-  exportData(): string {
+  async exportData(): Promise<string> {
+    await this.initialized;
     const data = {
-      notes: this.getNotes(),
-      theme: this.getTheme(),
+      notes: await this.getNotes(),
+      theme: await this.getTheme(),
       exportedAt: new Date().toISOString(),
       version: APP_CONFIG.STORAGE_VERSION,
     };
@@ -176,18 +178,19 @@ class StorageService {
   }
 
   /**
-   * Import data from JSON
+   * Import data from JSON (async)
    */
-  importData(jsonString: string): boolean {
+  async importData(jsonString: string): Promise<boolean> {
     try {
+      await this.initialized;
       const data = JSON.parse(jsonString);
 
       if (data.notes && Array.isArray(data.notes)) {
-        this.saveNotes(data.notes);
+        await this.saveNotes(data.notes);
       }
 
       if (data.theme && (data.theme === 'light' || data.theme === 'dark')) {
-        this.saveTheme(data.theme);
+        await this.saveTheme(data.theme);
       }
 
       return true;
@@ -198,20 +201,15 @@ class StorageService {
   }
 
   /**
-   * Get storage usage information
+   * Get storage usage information (async)
    */
-  getStorageInfo(): { used: number; available: boolean } {
-    if (!this.storageAvailable) {
-      return { used: 0, available: false };
-    }
-
+  async getStorageInfo(): Promise<{ used: number; available: boolean }> {
     try {
+      // Estimate storage usage by serializing all keys
       let used = 0;
-      for (const key in localStorage) {
-        if (localStorage.hasOwnProperty(key)) {
-          used += localStorage[key].length + key.length;
-        }
-      }
+      await localforage.iterate((value, key) => {
+        used += JSON.stringify(value).length + key.length;
+      });
       return { used, available: true };
     } catch (e) {
       return { used: 0, available: false };

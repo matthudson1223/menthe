@@ -34,69 +34,103 @@ export const saveNoteToDrive = async (
   }
 };
 
+interface TipTapNode {
+  type?: string;
+  text?: string;
+  content?: TipTapNode[];
+  attrs?: Record<string, unknown>;
+}
+
+/**
+ * Recursively extract plain text from a TipTap JSON node
+ */
+function extractTextFromNode(node: TipTapNode, listContext?: { type: 'bullet' | 'ordered'; index: number }): string {
+  if (!node || typeof node !== 'object') {
+    return '';
+  }
+
+  // Text nodes contain the actual text
+  if (node.type === 'text' && typeof node.text === 'string') {
+    return node.text;
+  }
+
+  // Handle nodes with content arrays
+  if (!Array.isArray(node.content)) {
+    // Handle hardBreak as newline
+    if (node.type === 'hardBreak') {
+      return '\n';
+    }
+    return '';
+  }
+
+  const childTexts: string[] = [];
+  let orderedIndex = 1;
+
+  for (const child of node.content) {
+    let childText = '';
+
+    if (node.type === 'bulletList') {
+      childText = extractTextFromNode(child, { type: 'bullet', index: 0 });
+    } else if (node.type === 'orderedList') {
+      childText = extractTextFromNode(child, { type: 'ordered', index: orderedIndex++ });
+    } else {
+      childText = extractTextFromNode(child, listContext);
+    }
+
+    if (childText) {
+      childTexts.push(childText);
+    }
+  }
+
+  const joinedText = childTexts.join('');
+
+  // Apply formatting based on node type
+  switch (node.type) {
+    case 'doc':
+      return childTexts.join('\n');
+    case 'paragraph':
+      return joinedText;
+    case 'heading':
+      return joinedText;
+    case 'listItem':
+      if (listContext?.type === 'bullet') {
+        return `• ${joinedText}`;
+      } else if (listContext?.type === 'ordered') {
+        return `${listContext.index}. ${joinedText}`;
+      }
+      return joinedText;
+    case 'bulletList':
+    case 'orderedList':
+      return childTexts.join('\n');
+    case 'blockquote':
+      return childTexts.map(line => `> ${line}`).join('\n');
+    case 'codeBlock':
+      return `\`\`\`\n${joinedText}\n\`\`\``;
+    case 'horizontalRule':
+      return '---';
+    default:
+      return joinedText;
+  }
+}
+
 /**
  * Parse TipTap JSON content to plain text
  */
 function parseTipTapContent(jsonString: string): string {
+  if (!jsonString || typeof jsonString !== 'string') {
+    return '';
+  }
+
+  // Check if it looks like JSON
+  const trimmed = jsonString.trim();
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    // Not JSON, return as-is after stripping any HTML tags
+    return jsonString.replace(/<[^>]*>/g, '').trim();
+  }
+
   try {
-    const doc = JSON.parse(jsonString);
-    const lines: string[] = [];
-
-    if (doc.content && Array.isArray(doc.content)) {
-      for (const node of doc.content) {
-        if (node.type === 'paragraph') {
-          if (node.content && Array.isArray(node.content)) {
-            const textParts: string[] = [];
-            for (const textNode of node.content) {
-              if (textNode.type === 'text' && textNode.text) {
-                textParts.push(textNode.text);
-              }
-            }
-            lines.push(textParts.join(''));
-          } else {
-            lines.push(''); // Empty paragraph
-          }
-        } else if (node.type === 'heading' && node.content) {
-          const headingText = node.content
-            .filter((n: any) => n.type === 'text')
-            .map((n: any) => n.text)
-            .join('');
-          lines.push(headingText);
-        } else if (node.type === 'bulletList' && node.content) {
-          for (const listItem of node.content) {
-            if (listItem.type === 'listItem' && listItem.content) {
-              for (const para of listItem.content) {
-                if (para.content) {
-                  const itemText = para.content
-                    .filter((n: any) => n.type === 'text')
-                    .map((n: any) => n.text)
-                    .join('');
-                  lines.push(`• ${itemText}`);
-                }
-              }
-            }
-          }
-        } else if (node.type === 'orderedList' && node.content) {
-          let index = 1;
-          for (const listItem of node.content) {
-            if (listItem.type === 'listItem' && listItem.content) {
-              for (const para of listItem.content) {
-                if (para.content) {
-                  const itemText = para.content
-                    .filter((n: any) => n.type === 'text')
-                    .map((n: any) => n.text)
-                    .join('');
-                  lines.push(`${index}. ${itemText}`);
-                }
-              }
-              index++;
-            }
-          }
-        }
-      }
-    }
-
-    return lines.join('\n');
+    const doc = JSON.parse(jsonString) as TipTapNode;
+    return extractTextFromNode(doc);
   } catch (e) {
     // If parsing fails, try to strip HTML tags as fallback
     return jsonString.replace(/<[^>]*>/g, '').trim();

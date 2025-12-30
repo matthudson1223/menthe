@@ -8,9 +8,13 @@ dotenv.config({ path: ".env.local" });
 dotenv.config(); // Fallback to .env
 
 const app = express();
+
+// Configure CORS with environment-based origin restriction
+const allowedOrigin = process.env.CLIENT_URL || process.env.VITE_CLIENT_URL;
 app.use(
   cors({
-    origin: true,
+    origin: allowedOrigin || (process.env.NODE_ENV === 'development' ? true : false),
+    credentials: true,
   }),
 );
 app.use(express.json({ limit: "20mb" }));

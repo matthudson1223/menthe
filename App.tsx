@@ -17,7 +17,7 @@ import type { ViewType, TabType, Note } from './types';
 
 function AppContent() {
   const { user, loading: authLoading, signOut } = useAuth();
-  const { notes, processing, recording } = useNotesContext();
+  const { notes, processing, recording, theme } = useNotesContext();
   const { showError } = useErrorHandler();
   const [view, setView] = useState<ViewType>('dashboard');
   const [activeTab, setActiveTab] = useState<TabType>('notes');
@@ -28,7 +28,7 @@ function AppContent() {
   // Keyboard shortcuts
   useKeyboardShortcuts({
     onNewNote: handleCreateNote,
-    onToggleTheme: () => {}, // Handled by Dashboard/Editor components
+    onToggleTheme: theme.toggleTheme,
     onSave: () => {}, // Can be extended
   });
 
