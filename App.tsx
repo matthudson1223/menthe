@@ -153,7 +153,7 @@ function AppContent() {
 
       {showFirstTimeHint && notes.notes.length === 0 && view === 'dashboard' && (
         <HelpTip
-          message="Press ⌘N to create your first note, or press ⌘K for quick actions!"
+          message="Press Ctrl+N to create your first note, or Ctrl+K for quick actions"
           action={{ label: "Got it", onClick: () => setShowFirstTimeHint(false) }}
           autoClose={8000}
         />

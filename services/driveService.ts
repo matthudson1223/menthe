@@ -155,28 +155,29 @@ function formatNoteContent(note: Note): string {
 
   // Summary section
   if (note.summaryText) {
-    lines.push('📝 SUMMARY');
+    lines.push('SUMMARY');
+    lines.push('-'.repeat(50));
     lines.push('');
     lines.push(note.summaryText);
     lines.push('');
-    lines.push('━'.repeat(50));
     lines.push('');
   }
 
   // User notes section
   if (note.userNotes) {
-    lines.push('✏️ NOTES');
+    lines.push('NOTES');
+    lines.push('-'.repeat(50));
     lines.push('');
     const parsedNotes = parseTipTapContent(note.userNotes);
     lines.push(parsedNotes);
     lines.push('');
-    lines.push('━'.repeat(50));
     lines.push('');
   }
 
   // Transcript section
   if (note.verbatimText) {
-    lines.push('🎙️ TRANSCRIPT');
+    lines.push('TRANSCRIPT');
+    lines.push('-'.repeat(50));
     lines.push('');
     lines.push(note.verbatimText);
   }
