@@ -3,6 +3,7 @@ import { BrainCircuit, FileText, Moon, Sun, Mic, Zap } from 'lucide-react';
 import { NoteCard } from './NoteCard';
 import { NoteStats } from './NoteStats';
 import { SearchFilters } from './SearchFilters';
+import { SideMenu } from './SideMenu';
 import { Input } from './ui';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
 import { CommandPalette } from './CommandPalette';
@@ -28,6 +29,7 @@ export const Dashboard = React.memo<DashboardProps>(({
   const { notes, theme, chat } = useNotesContext();
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedFilters, setSelectedFilters] = React.useState<string[]>([]);
+  const [selectedGroup, setSelectedGroup] = React.useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = React.useState(false);
   const [showCommandPalette, setShowCommandPalette] = React.useState(false);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
@@ -82,6 +84,15 @@ export const Dashboard = React.memo<DashboardProps>(({
   const filteredNotes = React.useMemo(() => {
     let result = notes.notes;
 
+    // Apply group filter (tag-based)
+    if (selectedGroup !== null) {
+      if (selectedGroup === '__untagged__') {
+        result = result.filter(note => !note.tags || note.tags.length === 0);
+      } else {
+        result = result.filter(note => note.tags?.includes(selectedGroup));
+      }
+    }
+
     // Apply text search
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -107,7 +118,7 @@ export const Dashboard = React.memo<DashboardProps>(({
     }
 
     return result;
-  }, [notes.notes, searchQuery, selectedFilters]);
+  }, [notes.notes, searchQuery, selectedFilters, selectedGroup]);
 
   const handleNoteClick = (note: Note) => {
     notes.setActiveNote(note);
@@ -117,14 +128,28 @@ export const Dashboard = React.memo<DashboardProps>(({
   return (
     <div className="max-w-3xl mx-auto p-4 md:p-6 pb-32">
       <header className="mb-8 flex justify-between items-center sticky top-0 bg-slate-50 dark:bg-slate-950 z-10 py-4 transition-colors">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <BrainCircuit className="text-blue-600 dark:text-blue-500" />
-            {APP_CONFIG.APP_NAME}
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">
-            My Notes {searchQuery && `(${filteredNotes.length} results)`}
-          </p>
+        <div className="flex items-center gap-3">
+          <SideMenu selectedGroup={selectedGroup} onGroupSelect={setSelectedGroup} />
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <BrainCircuit className="text-blue-600 dark:text-blue-500" />
+              {APP_CONFIG.APP_NAME}
+            </h1>
+            <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">
+              {selectedGroup && selectedGroup !== '__untagged__' ? (
+                <span className="flex items-center gap-1">
+                  <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full text-xs font-medium">
+                    {selectedGroup}
+                  </span>
+                  <span>({filteredNotes.length})</span>
+                </span>
+              ) : selectedGroup === '__untagged__' ? (
+                <span>Untagged Notes ({filteredNotes.length})</span>
+              ) : (
+                <>My Notes {searchQuery && `(${filteredNotes.length} results)`}</>
+              )}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button

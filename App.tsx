@@ -17,7 +17,7 @@ import * as geminiService from './services/geminiService';
 import type { ViewType, TabType, Note } from './types';
 
 function AppContent() {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { notes, processing, recording, theme } = useNotesContext();
   const { showError } = useErrorHandler();
   const [view, setView] = useState<ViewType>('dashboard');
@@ -158,14 +158,6 @@ function AppContent() {
           autoClose={8000}
         />
       )}
-
-      <button
-        type="button"
-        onClick={signOut}
-        className="fixed bottom-4 right-4 rounded-full bg-slate-900 dark:bg-slate-100 text-slate-50 dark:text-slate-900 px-4 py-2 text-xs font-medium shadow-md hover:bg-slate-800 dark:hover:bg-slate-200"
-      >
-        Sign out
-      </button>
     </div>
   );
 }
