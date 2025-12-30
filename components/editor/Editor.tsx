@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Clock, Sparkles, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useGoogleLogin } from '@react-oauth/google';
@@ -15,7 +15,7 @@ import { useErrorHandler } from '../../hooks/useErrorHandler';
 import * as geminiService from '../../services/geminiService';
 import * as driveService from '../../services/driveService';
 import { MESSAGES, APP_CONFIG } from '../../constants';
-import { sanitizeFilename, copyToClipboard } from '../../utils/helpers';
+import { sanitizeFilename, copyToClipboard, debounce } from '../../utils/helpers';
 import { tiptapToHTML, tiptapToMarkdown } from '../../utils/tiptapHelpers';
 import type { TabType, SaveStatus } from '../../types';
 
@@ -40,6 +40,32 @@ export const Editor = React.memo<EditorProps>(({
   const pdfContentRef = useRef<HTMLDivElement>(null);
 
   const activeNote = notes.activeNote;
+
+  // Title input state with focus tracking
+  const [localTitle, setLocalTitle] = useState(activeNote?.title || '');
+  const [isTitleFocused, setIsTitleFocused] = useState(false);
+
+  // Debounced title update
+  const debouncedUpdateTitle = useMemo(
+    () => debounce((id: string, title: string) => {
+      notes.updateNote(id, { title });
+    }, 150),
+    [notes]
+  );
+
+  // Sync external title changes only when not focused
+  useEffect(() => {
+    if (!isTitleFocused && activeNote?.title !== localTitle) {
+      setLocalTitle(activeNote?.title || '');
+    }
+  }, [activeNote?.title, isTitleFocused, localTitle]);
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!activeNote) return;
+    const newTitle = e.target.value;
+    setLocalTitle(newTitle);
+    debouncedUpdateTitle(activeNote.id, newTitle);
+  };
 
   // Set up Google OAuth login
   const googleLogin = useGoogleLogin({
@@ -265,8 +291,10 @@ ${activeNote.verbatimText ? `## Transcript\n${activeNote.verbatimText}\n` : ''}`
         }`}
       >
         <input
-          value={activeNote.title}
-          onChange={(e) => notes.updateNote(activeNote.id, { title: e.target.value })}
+          value={localTitle}
+          onChange={handleTitleChange}
+          onFocus={() => setIsTitleFocused(true)}
+          onBlur={() => setIsTitleFocused(false)}
           className="text-2xl font-bold w-full outline-none text-slate-800 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 bg-transparent transition-colors"
           placeholder="Untitled Note"
         />

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Wand2, ArrowLeft, Sparkles, BrainCircuit, Edit2, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { TagManager } from '../TagManager';
 import type { Note } from '../../types';
+import { debounce } from '../../utils/helpers';
 
 interface SummaryTabProps {
   note: Note;
@@ -20,6 +21,29 @@ export const SummaryTab = React.memo<SummaryTabProps>(({
   const [isEditingSummary, setIsEditingSummary] = useState(false);
   const [refineInput, setRefineInput] = useState('');
   const [isRefining, setIsRefining] = useState(false);
+  const [localSummary, setLocalSummary] = useState(note.summaryText || '');
+  const [isSummaryFocused, setIsSummaryFocused] = useState(false);
+
+  // Debounced update function for summary
+  const debouncedUpdateSummary = useMemo(
+    () => debounce((value: string) => {
+      onUpdate({ summaryText: value });
+    }, 150),
+    [onUpdate]
+  );
+
+  // Sync external changes only when not focused
+  useEffect(() => {
+    if (!isSummaryFocused && note.summaryText !== localSummary) {
+      setLocalSummary(note.summaryText || '');
+    }
+  }, [note.summaryText, isSummaryFocused, localSummary]);
+
+  const handleSummaryChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    setLocalSummary(newValue);
+    debouncedUpdateSummary(newValue);
+  };
 
   const handleRefineSummary = async () => {
     if (!refineInput.trim()) return;
@@ -56,8 +80,10 @@ export const SummaryTab = React.memo<SummaryTabProps>(({
         {note.summaryText ? (
           isEditingSummary ? (
             <textarea
-              value={note.summaryText}
-              onChange={(e) => onUpdate({ summaryText: e.target.value })}
+              value={localSummary}
+              onChange={handleSummaryChange}
+              onFocus={() => setIsSummaryFocused(true)}
+              onBlur={() => setIsSummaryFocused(false)}
               className="w-full h-full min-h-[400px] outline-none resize-none text-slate-700 dark:text-slate-200 bg-transparent leading-relaxed whitespace-pre-wrap break-words text-sm md:text-base font-mono"
               autoFocus
             />

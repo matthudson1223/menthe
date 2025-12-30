@@ -57,6 +57,7 @@ export function useNotes(): UseNotesReturn {
   const [activeNote, setActiveNote] = useState<Note | null>(null);
   const { user } = useAuth();
   const pendingWrites = useRef<Map<string, Promise<void>>>(new Map());
+  const pendingLocalUpdates = useRef<Map<string, Set<string>>>(new Map());
 
   const enqueueWrite = useCallback(
     (noteId: string, operation: () => Promise<void>, onError: (error: unknown) => void) => {
@@ -94,9 +95,31 @@ export function useNotes(): UseNotesReturn {
       snapshot => {
         const loadedNotes: Note[] = snapshot.docs.map(docSnap => {
           const data = docSnap.data() as Note;
+          const noteId = data.id ?? docSnap.id;
+
+          // Check for pending local updates
+          const pendingFields = pendingLocalUpdates.current.get(noteId);
+
+          // If we have pending updates, merge carefully
+          if (pendingFields && pendingFields.size > 0) {
+            // Get current note to preserve local values for pending fields
+            const currentNote = notes.find(n => n.id === noteId);
+            if (currentNote) {
+              // Keep local values for pending fields, use Firestore for others
+              const mergedData: Note = { ...data, id: noteId, isProcessing: false };
+              pendingFields.forEach(field => {
+                const fieldKey = field as keyof Note;
+                if (currentNote[fieldKey] !== undefined) {
+                  (mergedData as any)[fieldKey] = currentNote[fieldKey];
+                }
+              });
+              return mergedData;
+            }
+          }
+
           return {
             ...data,
-            id: data.id ?? docSnap.id,
+            id: noteId,
             isProcessing: false,
           };
         });
@@ -155,6 +178,15 @@ export function useNotes(): UseNotesReturn {
   }, [user, db, enqueueWrite]);
 
   const updateNote = useCallback((id: string, updates: Partial<Note>) => {
+    // Track which fields are being updated
+    const updatedFields = new Set(Object.keys(updates));
+
+    // Mark fields as pending local update
+    const pending = pendingLocalUpdates.current.get(id) || new Set<string>();
+    updatedFields.forEach(field => pending.add(field));
+    pendingLocalUpdates.current.set(id, pending);
+
+    // Optimistic local update
     setNotes(prev => prev.map(note =>
       note.id === id ? applyUpdates(note, updates) : note
     ));
@@ -167,11 +199,49 @@ export function useNotes(): UseNotesReturn {
     if (uid) {
       const noteRef = doc(db, 'users', uid, 'notes', id);
       const cleanedUpdates = removeUndefinedFields(sanitizeUpdates(updates));
-      enqueueWrite(id, () => updateDoc(noteRef, cleanedUpdates), error => {
-        console.error('Error updating note in Firestore:', error);
-      });
+
+      const writePromise = updateDoc(noteRef, cleanedUpdates);
+
+      enqueueWrite(
+        id,
+        () => writePromise,
+        error => {
+          console.error('Error updating note in Firestore:', error);
+          // On error, clear pending fields so external updates can sync
+          const pending = pendingLocalUpdates.current.get(id);
+          if (pending) {
+            updatedFields.forEach(field => pending.delete(field));
+            if (pending.size === 0) {
+              pendingLocalUpdates.current.delete(id);
+            }
+          }
+        }
+      );
+
+      // Clear pending status after write completes
+      writePromise
+        .then(() => {
+          const pending = pendingLocalUpdates.current.get(id);
+          if (pending) {
+            updatedFields.forEach(field => pending.delete(field));
+            if (pending.size === 0) {
+              pendingLocalUpdates.current.delete(id);
+            }
+          }
+        })
+        .catch(() => {
+          // Error already handled above
+        });
     } else {
       console.warn('Cannot update note in Firestore: no authenticated user');
+      // Clear pending since we're not actually writing
+      const pending = pendingLocalUpdates.current.get(id);
+      if (pending) {
+        updatedFields.forEach(field => pending.delete(field));
+        if (pending.size === 0) {
+          pendingLocalUpdates.current.delete(id);
+        }
+      }
     }
   }, [user, db, enqueueWrite]);
 

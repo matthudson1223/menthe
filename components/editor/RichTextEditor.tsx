@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -16,6 +16,9 @@ interface RichTextEditorProps {
 
 export const RichTextEditor = React.memo<RichTextEditorProps>(
   ({ content, onChange, placeholder = 'Start typing...', onEditorReady }) => {
+    const [isFocused, setIsFocused] = useState(false);
+    const pendingExternalUpdate = useRef<string | null>(null);
+
     const editor = useEditor({
       extensions: [
         StarterKit.configure({
@@ -41,7 +44,19 @@ export const RichTextEditor = React.memo<RichTextEditorProps>(
       onUpdate: debounce(({ editor }) => {
         const json = JSON.stringify(editor.getJSON());
         onChange(json);
-      }, 300)
+      }, 150),
+      onFocus: () => {
+        setIsFocused(true);
+      },
+      onBlur: () => {
+        setIsFocused(false);
+        // Apply pending external update after losing focus
+        if (pendingExternalUpdate.current && editor) {
+          const parsedContent = parseContent(pendingExternalUpdate.current);
+          editor.commands.setContent(parsedContent);
+          pendingExternalUpdate.current = null;
+        }
+      }
     });
 
     // Notify parent when editor is ready
@@ -51,13 +66,22 @@ export const RichTextEditor = React.memo<RichTextEditorProps>(
       }
     }, [editor, onEditorReady]);
 
-    // Update content when it changes externally
+    // Update content when it changes externally (but not while user is typing)
     useEffect(() => {
-      if (editor && content !== JSON.stringify(editor.getJSON())) {
+      if (!editor) return;
+
+      const currentContent = JSON.stringify(editor.getJSON());
+      if (content === currentContent) return; // No change needed
+
+      if (isFocused) {
+        // User is actively editing - queue the external update for later
+        pendingExternalUpdate.current = content;
+      } else {
+        // Not focused - safe to apply external update immediately
         const parsedContent = parseContent(content);
         editor.commands.setContent(parsedContent);
       }
-    }, [content, editor]);
+    }, [content, editor, isFocused]);
 
     if (!editor) {
       return null;
