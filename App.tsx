@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { NotesProvider, useNotesContext } from './context/NotesContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SettingsProvider } from './context/SettingsContext';
 import { ErrorProvider, useErrorHandler } from './hooks/useErrorHandler';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ProcessingOverlay } from './components/ProcessingOverlay';
 import { Dashboard } from './components/Dashboard';
 import { Editor } from './components/editor';
+import { Settings } from './components/Settings';
 import { ChatPanel } from './components/ChatPanel';
 import { RecordingStatusBar } from './components/RecordingStatusBar';
 import { AuthScreen } from './components/AuthScreen';
@@ -58,6 +60,10 @@ function AppContent() {
   function handleBackToDashboard() {
     setView('dashboard');
     notes.setActiveNote(null);
+  }
+
+  function handleOpenSettings() {
+    setView('settings');
   }
 
   async function handleStartRecording() {
@@ -137,7 +143,10 @@ function AppContent() {
         <Dashboard
           onNavigateToEditor={handleNavigateToEditor}
           onCreateNote={handleCreateNote}
+          onOpenSettings={handleOpenSettings}
         />
+      ) : view === 'settings' ? (
+        <Settings onBack={handleBackToDashboard} />
       ) : (
         <Editor
           activeTab={activeTab}
@@ -173,11 +182,13 @@ export default function App() {
     <ErrorBoundary>
       <GoogleOAuthProvider clientId={googleClientId}>
         <AuthProvider>
-          <NotesProvider>
-            <ErrorProvider>
-              <AppContent />
-            </ErrorProvider>
-          </NotesProvider>
+          <SettingsProvider>
+            <NotesProvider>
+              <ErrorProvider>
+                <AppContent />
+              </ErrorProvider>
+            </NotesProvider>
+          </SettingsProvider>
         </AuthProvider>
       </GoogleOAuthProvider>
     </ErrorBoundary>

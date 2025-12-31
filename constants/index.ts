@@ -3,6 +3,7 @@ export const STORAGE_KEYS = {
   NOTES: 'notes',
   FOLDERS: 'folders',
   THEME: 'theme',
+  SETTINGS: 'settings',
   STORAGE_VERSION: 'storage_version',
 } as const;
 
@@ -94,3 +95,13 @@ export const ANIMATION = {
 // Filter Constants
 export const FILTER_UNTAGGED = '__untagged__';
 export const FILTER_TRASH = '__trash__';
+
+// Default Settings
+export const DEFAULT_SETTINGS = {
+  themeMode: 'system' as const,
+  exportDefaults: {
+    includeTags: true,
+    includeSummary: true,
+    pdfFormat: 'a4' as const,
+  },
+} as const;

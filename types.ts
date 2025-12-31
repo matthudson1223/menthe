@@ -55,9 +55,27 @@ export interface ChatMessage {
 }
 
 // View Types
-export type ViewType = 'dashboard' | 'editor';
+export type ViewType = 'dashboard' | 'editor' | 'settings';
 export type TabType = 'notes' | 'files' | 'transcript' | 'summary';
 export type SaveStatus = 'idle' | 'saving' | 'success';
+
+// Settings Types
+export type ThemeMode = 'system' | 'light' | 'dark';
+export type PdfFormat = 'a4' | 'letter';
+
+export interface ExportDefaults {
+  includeTags: boolean;
+  includeSummary: boolean;
+  pdfFormat: PdfFormat;
+}
+
+export interface AppSettings {
+  themeMode: ThemeMode;
+  exportDefaults: ExportDefaults;
+  apiKey?: string; // For self-hosted/custom API usage
+}
+
+export type SettingsTabType = 'general' | 'appearance' | 'export' | 'account';
 
 // Storage Types
 export interface StorageData {
@@ -129,7 +147,9 @@ export interface UseChatReturn {
 
 export interface UseThemeReturn {
   darkMode: boolean;
+  themeMode: ThemeMode;
   toggleTheme: () => void;
+  setThemeMode: (mode: ThemeMode) => void;
 }
 
 export interface UseRecordingReturn {

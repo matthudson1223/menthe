@@ -21,11 +21,13 @@ interface DashboardProps {
     editingSummary: boolean
   ) => void;
   onCreateNote: () => void;
+  onOpenSettings?: () => void;
 }
 
 export const Dashboard = React.memo<DashboardProps>(({
   onNavigateToEditor,
   onCreateNote,
+  onOpenSettings,
 }) => {
   const { notes, theme, chat, folders } = useNotesContext();
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -217,7 +219,7 @@ export const Dashboard = React.memo<DashboardProps>(({
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950">
       {/* Sidebar - hidden on mobile, visible on desktop */}
       <div className="hidden lg:block lg:flex-shrink-0">
-        <SideMenu selectedGroup={selectedGroup} onGroupSelect={setSelectedGroup} />
+        <SideMenu selectedGroup={selectedGroup} onGroupSelect={setSelectedGroup} onOpenSettings={onOpenSettings} />
       </div>
 
       {/* Main content area */}
@@ -228,7 +230,7 @@ export const Dashboard = React.memo<DashboardProps>(({
               <div className="flex items-center gap-2">
                 {/* Mobile hamburger menu */}
                 <div className="lg:hidden">
-                  <SideMenu selectedGroup={selectedGroup} onGroupSelect={setSelectedGroup} />
+                  <SideMenu selectedGroup={selectedGroup} onGroupSelect={setSelectedGroup} onOpenSettings={onOpenSettings} />
                 </div>
                 <div>
               <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
