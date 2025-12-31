@@ -18,14 +18,14 @@ export const saveNoteToDrive = async (
     // Check if we're updating an existing file or creating a new one
     if (note.driveFileId) {
       // Update existing file
-      await updateDriveFile(note.driveFileId, content, accessToken);
+      await updateDriveFile(note.driveFileId, content, accessToken, note);
       return note.driveFileId;
     } else {
       // Get or create the "Menthe Exports" folder
       const folderId = await getOrCreateFolder(accessToken);
 
       // Create new file in the folder
-      const fileId = await createDriveFile(fileName, content, accessToken, folderId);
+      const fileId = await createDriveFile(fileName, content, accessToken, folderId, note);
       return fileId;
     }
   } catch (error) {
@@ -239,17 +239,23 @@ async function getOrCreateFolder(accessToken: string): Promise<string> {
 
 /**
  * Create a new Google Doc file in Google Drive
+ * Stores the full Note JSON in the description field for two-way sync
  */
 async function createDriveFile(
   fileName: string,
   content: string,
   accessToken: string,
-  folderId: string
+  folderId: string,
+  note: Note
 ): Promise<string> {
+  // Serialize note to JSON and store in description for sync
+  const noteJson = JSON.stringify(note);
+
   const metadata = {
     name: fileName,
     mimeType: 'application/vnd.google-apps.document',
     parents: [folderId],
+    description: noteJson, // Store full note data for two-way sync
   };
 
   const form = new FormData();
@@ -281,13 +287,16 @@ async function createDriveFile(
 
 /**
  * Update an existing Google Doc file in Google Drive
+ * Updates both the content and the description (which stores the Note JSON)
  */
 async function updateDriveFile(
   fileId: string,
   content: string,
-  accessToken: string
+  accessToken: string,
+  note: Note
 ): Promise<void> {
-  const response = await fetch(
+  // First, update the file content
+  const contentResponse = await fetch(
     `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
     {
       method: 'PATCH',
@@ -299,9 +308,30 @@ async function updateDriveFile(
     }
   );
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'Failed to update file');
+  if (!contentResponse.ok) {
+    const error = await contentResponse.json();
+    throw new Error(error.error?.message || 'Failed to update file content');
+  }
+
+  // Then, update the metadata (description with Note JSON)
+  const noteJson = JSON.stringify(note);
+  const metadataResponse = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        description: noteJson,
+      }),
+    }
+  );
+
+  if (!metadataResponse.ok) {
+    const error = await metadataResponse.json();
+    throw new Error(error.error?.message || 'Failed to update file metadata');
   }
 }
 
@@ -311,3 +341,87 @@ async function updateDriveFile(
 export function getDriveFileUrl(fileId: string): string {
   return `https://docs.google.com/document/d/${fileId}/edit`;
 }
+
+/**
+ * Interface for Drive file metadata
+ */
+interface DriveFile {
+  id: string;
+  name: string;
+  description?: string;
+  modifiedTime: string;
+}
+
+/**
+ * List all Menthe files from Google Drive
+ * Fetches files from the "Menthe Exports" folder with their description field
+ * @param accessToken - Google OAuth access token
+ * @returns Array of Drive files with metadata
+ */
+export const listMentheFiles = async (accessToken: string): Promise<DriveFile[]> => {
+  try {
+    // Get the Menthe Exports folder ID
+    const folderId = await getOrCreateFolder(accessToken);
+
+    // Query for all files in the folder, requesting description field
+    const response = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q='${folderId}' in parents and trashed=false&fields=files(id,name,description,modifiedTime)&orderBy=modifiedTime desc`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to list files from Drive');
+    }
+
+    const data = await response.json();
+    return data.files || [];
+  } catch (error) {
+    console.error('Error listing Drive files:', error);
+    throw new Error('Failed to list files from Google Drive. Please try again.');
+  }
+};
+
+/**
+ * Import notes from Google Drive
+ * Parses the Note JSON from the description field of Drive files
+ * @param accessToken - Google OAuth access token
+ * @returns Array of Note objects from Drive
+ */
+export const importNotesFromDrive = async (accessToken: string): Promise<Note[]> => {
+  try {
+    const driveFiles = await listMentheFiles(accessToken);
+    const importedNotes: Note[] = [];
+
+    for (const file of driveFiles) {
+      try {
+        if (file.description) {
+          // Parse the Note JSON from the description field
+          const note = JSON.parse(file.description) as Note;
+
+          // Ensure the note has the Drive file ID
+          note.driveFileId = file.id;
+
+          // Use Drive's modifiedTime as a fallback for updatedAt if not present
+          if (!note.updatedAt && file.modifiedTime) {
+            note.updatedAt = new Date(file.modifiedTime).getTime();
+          }
+
+          importedNotes.push(note);
+        }
+      } catch (parseError) {
+        console.warn(`Failed to parse note from Drive file ${file.id}:`, parseError);
+        // Skip files that can't be parsed
+      }
+    }
+
+    return importedNotes;
+  } catch (error) {
+    console.error('Error importing notes from Drive:', error);
+    throw new Error('Failed to import notes from Google Drive. Please try again.');
+  }
+};

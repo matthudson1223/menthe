@@ -1,18 +1,31 @@
 import React, { useState, useRef } from 'react';
 import { Note } from '../types';
-import { FileText, Mic, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { FileText, Mic, Image as ImageIcon, Trash2, Pin, Check } from 'lucide-react';
 
 interface Props {
   note: Note;
   onClick: (note: Note) => void;
   onDelete: (noteId: string) => void;
+  onTogglePin?: (noteId: string) => void;
+  isSelected?: boolean;
+  onToggleSelect?: (noteId: string) => void;
+  isSelectionMode?: boolean;
 }
 
-export const NoteCard: React.FC<Props> = ({ note, onClick, onDelete }) => {
+export const NoteCard: React.FC<Props> = ({
+  note,
+  onClick,
+  onDelete,
+  onTogglePin,
+  isSelected = false,
+  onToggleSelect,
+  isSelectionMode = false,
+}) => {
   const Icon = note.type === 'audio' ? Mic : note.type === 'image' ? ImageIcon : FileText;
 
   const [offset, setOffset] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const startX = useRef<number>(0);
   const currentOffset = useRef<number>(0);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -76,6 +89,16 @@ export const NoteCard: React.FC<Props> = ({ note, onClick, onDelete }) => {
     setOffset(0);
   };
 
+  const handlePinClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onTogglePin?.(note.id);
+  };
+
+  const handleSelectClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleSelect?.(note.id);
+  };
+
   const getPreviewText = () => {
     if (note.summaryText) return note.summaryText;
     if (note.verbatimText) return note.verbatimText;
@@ -118,7 +141,38 @@ export const NoteCard: React.FC<Props> = ({ note, onClick, onDelete }) => {
         onMouseMove={handleTouchMove}
         onMouseUp={handleTouchEnd}
         onMouseLeave={handleTouchEnd}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseOut={() => setIsHovered(false)}
       >
+        {/* Selection checkbox */}
+        {(isSelectionMode || isHovered) && onToggleSelect && (
+          <button
+            onClick={handleSelectClick}
+            className={`absolute top-2 left-2 z-20 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+              isSelected
+                ? 'bg-blue-600 border-blue-600'
+                : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 hover:border-blue-500'
+            }`}
+          >
+            {isSelected && <Check size={14} className="text-white" />}
+          </button>
+        )}
+
+        {/* Pin button */}
+        {onTogglePin && (isHovered || note.isPinned) && (
+          <button
+            onClick={handlePinClick}
+            className={`absolute top-2 right-2 z-20 p-1 rounded transition-all ${
+              note.isPinned
+                ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
+                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+            title={note.isPinned ? "Unpin note" : "Pin note"}
+          >
+            <Pin size={14} fill={note.isPinned ? 'currentColor' : 'none'} />
+          </button>
+        )}
+
         <button
           onClick={handleContentClick}
           className="w-full text-left p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors outline-none"

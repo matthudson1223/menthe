@@ -1,6 +1,7 @@
 // Storage Keys
 export const STORAGE_KEYS = {
   NOTES: 'notes',
+  FOLDERS: 'folders',
   THEME: 'theme',
   STORAGE_VERSION: 'storage_version',
 } as const;
@@ -89,3 +90,7 @@ export const ANIMATION = {
   TOAST_DURATION: 2000, // ms
   DEBOUNCE_DELAY: 300, // ms
 } as const;
+
+// Filter Constants
+export const FILTER_UNTAGGED = '__untagged__';
+export const FILTER_TRASH = '__trash__';

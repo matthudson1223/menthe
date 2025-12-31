@@ -4,6 +4,7 @@ import { Note, NoteType, UseNotesReturn } from '../types';
 import { DEFAULTS } from '../constants';
 import { db } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
+import { importNotesFromDrive } from '../services/driveService';
 
 /**
  * Custom hook for managing notes
@@ -140,6 +141,7 @@ export function useNotes(): UseNotesReturn {
     initialData?: { url?: string; text?: string }
   ): Note => {
     const uid = user?.uid;
+    const now = Date.now();
     const newNote: Note = {
       id: crypto.randomUUID(),
       title: DEFAULTS.NOTE_TITLE,
@@ -150,14 +152,15 @@ export function useNotes(): UseNotesReturn {
             id: crypto.randomUUID(),
             type: type === 'audio' ? 'audio' : 'image',
             url: initialData.url,
-            createdAt: Date.now(),
+            createdAt: now,
           }]
         : [],
       verbatimText: '',
       userNotes: initialData?.text || '',
       summaryText: '',
       tags: [],
-      createdAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
       isProcessing: false,
     };
 
@@ -186,19 +189,25 @@ export function useNotes(): UseNotesReturn {
     updatedFields.forEach(field => pending.add(field));
     pendingLocalUpdates.current.set(id, pending);
 
+    // Add updatedAt timestamp to track modifications
+    const updatesWithTimestamp = {
+      ...updates,
+      updatedAt: Date.now(),
+    };
+
     // Optimistic local update
     setNotes(prev => prev.map(note =>
-      note.id === id ? applyUpdates(note, updates) : note
+      note.id === id ? applyUpdates(note, updatesWithTimestamp) : note
     ));
 
     setActiveNote(prev =>
-      prev?.id === id ? applyUpdates(prev, updates) : prev
+      prev?.id === id ? applyUpdates(prev, updatesWithTimestamp) : prev
     );
 
     const uid = user?.uid;
     if (uid) {
       const noteRef = doc(db, 'users', uid, 'notes', id);
-      const cleanedUpdates = removeUndefinedFields(sanitizeUpdates(updates));
+      const cleanedUpdates = removeUndefinedFields(sanitizeUpdates(updatesWithTimestamp));
 
       const writePromise = updateDoc(noteRef, cleanedUpdates);
 
@@ -246,6 +255,75 @@ export function useNotes(): UseNotesReturn {
   }, [user, db, enqueueWrite]);
 
   const deleteNote = useCallback((noteId: string) => {
+    // Soft delete: set deletedAt timestamp instead of removing
+    const deletedAtTimestamp = Date.now();
+
+    setNotes(prev => prev.map(note =>
+      note.id === noteId
+        ? { ...note, deletedAt: deletedAtTimestamp, updatedAt: deletedAtTimestamp }
+        : note
+    ));
+
+    setActiveNote(prev => {
+      if (prev?.id === noteId) {
+        return null;
+      }
+      return prev;
+    });
+
+    const uid = user?.uid;
+    if (uid) {
+      const noteRef = doc(db, 'users', uid, 'notes', noteId);
+      enqueueWrite(noteId, () => updateDoc(noteRef, {
+        deletedAt: deletedAtTimestamp,
+        updatedAt: deletedAtTimestamp,
+      }), error => {
+        console.error('Error soft deleting note in Firestore:', error);
+      });
+    } else {
+      console.warn('Cannot soft delete note in Firestore: no authenticated user');
+    }
+  }, [user, db, enqueueWrite]);
+
+  const restoreNote = useCallback((noteId: string) => {
+    // Restore note by clearing deletedAt timestamp
+    const restoredAtTimestamp = Date.now();
+
+    setNotes(prev => prev.map(note => {
+      if (note.id === noteId) {
+        const { deletedAt, ...noteWithoutDeletedAt } = note;
+        return { ...noteWithoutDeletedAt, updatedAt: restoredAtTimestamp };
+      }
+      return note;
+    }));
+
+    setActiveNote(prev => {
+      if (prev?.id === noteId) {
+        const { deletedAt, ...noteWithoutDeletedAt } = prev;
+        return { ...noteWithoutDeletedAt, updatedAt: restoredAtTimestamp };
+      }
+      return prev;
+    });
+
+    const uid = user?.uid;
+    if (uid) {
+      const noteRef = doc(db, 'users', uid, 'notes', noteId);
+      enqueueWrite(noteId, async () => {
+        // Use updateDoc to remove the deletedAt field
+        await updateDoc(noteRef, {
+          deletedAt: null,
+          updatedAt: restoredAtTimestamp,
+        });
+      }, error => {
+        console.error('Error restoring note in Firestore:', error);
+      });
+    } else {
+      console.warn('Cannot restore note in Firestore: no authenticated user');
+    }
+  }, [user, db, enqueueWrite]);
+
+  const permanentlyDeleteNote = useCallback((noteId: string) => {
+    // Permanently delete: remove from Firestore
     setNotes(prev => prev.filter(note => note.id !== noteId));
 
     setActiveNote(prev => {
@@ -259,12 +337,102 @@ export function useNotes(): UseNotesReturn {
     if (uid) {
       const noteRef = doc(db, 'users', uid, 'notes', noteId);
       enqueueWrite(noteId, () => deleteDoc(noteRef), error => {
-        console.error('Error deleting note from Firestore:', error);
+        console.error('Error permanently deleting note from Firestore:', error);
       });
     } else {
-      console.warn('Cannot delete note from Firestore: no authenticated user');
+      console.warn('Cannot permanently delete note from Firestore: no authenticated user');
     }
   }, [user, db, enqueueWrite]);
+
+  const togglePin = useCallback((noteId: string) => {
+    const note = notes.find(n => n.id === noteId);
+    if (!note) return;
+
+    const newPinnedState = !note.isPinned;
+    const updatedAtTimestamp = Date.now();
+
+    setNotes(prev => prev.map(n =>
+      n.id === noteId
+        ? { ...n, isPinned: newPinnedState, updatedAt: updatedAtTimestamp }
+        : n
+    ));
+
+    setActiveNote(prev =>
+      prev?.id === noteId
+        ? { ...prev, isPinned: newPinnedState, updatedAt: updatedAtTimestamp }
+        : prev
+    );
+
+    const uid = user?.uid;
+    if (uid) {
+      const noteRef = doc(db, 'users', uid, 'notes', noteId);
+      enqueueWrite(noteId, () => updateDoc(noteRef, {
+        isPinned: newPinnedState,
+        updatedAt: updatedAtTimestamp,
+      }), error => {
+        console.error('Error toggling pin in Firestore:', error);
+      });
+    } else {
+      console.warn('Cannot toggle pin in Firestore: no authenticated user');
+    }
+  }, [notes, user, db, enqueueWrite]);
+
+  const syncWithDrive = useCallback(async (accessToken: string) => {
+    const uid = user?.uid;
+    if (!uid) {
+      throw new Error('Cannot sync with Drive: no authenticated user');
+    }
+
+    try {
+      // Import notes from Drive
+      const driveNotes = await importNotesFromDrive(accessToken);
+
+      // Create a map of local notes by ID
+      const localNotesMap = new Map<string, Note>();
+      notes.forEach(note => {
+        localNotesMap.set(note.id, note);
+      });
+
+      // Track notes to create or update
+      const notesToSync: Note[] = [];
+
+      // Process each Drive note
+      for (const driveNote of driveNotes) {
+        const localNote = localNotesMap.get(driveNote.id);
+
+        if (!localNote) {
+          // Note exists in Drive but not locally - create it
+          notesToSync.push(driveNote);
+        } else {
+          // Note exists in both - apply "Last Modified Wins" conflict resolution
+          const driveUpdatedAt = driveNote.updatedAt || driveNote.createdAt;
+          const localUpdatedAt = localNote.updatedAt || localNote.createdAt;
+
+          if (driveUpdatedAt > localUpdatedAt) {
+            // Drive version is newer - update local
+            notesToSync.push(driveNote);
+          }
+          // If local is newer or equal, keep local version (no action needed)
+        }
+      }
+
+      // Sync notes to Firestore
+      for (const note of notesToSync) {
+        const noteRef = doc(db, 'users', uid, 'notes', note.id);
+        const cleanedNote = removeUndefinedFields(note);
+
+        // Use setDoc to create or overwrite
+        await setDoc(noteRef, cleanedNote);
+      }
+
+      console.log(`Synced ${notesToSync.length} notes from Google Drive`);
+
+      // Notes will be updated via the Firestore listener
+    } catch (error) {
+      console.error('Error syncing with Drive:', error);
+      throw new Error('Failed to sync with Google Drive. Please try again.');
+    }
+  }, [user, db, notes]);
 
   return {
     notes,
@@ -273,5 +441,9 @@ export function useNotes(): UseNotesReturn {
     createNote,
     updateNote,
     deleteNote,
+    restoreNote,
+    permanentlyDeleteNote,
+    togglePin,
+    syncWithDrive,
   };
 }

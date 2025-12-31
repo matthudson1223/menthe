@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { FileText, Moon, Sun, Mic, Zap, Search, Edit3, Image, Cpu, HelpCircle } from 'lucide-react';
+import { FileText, Moon, Sun, Mic, Zap, Search, Edit3, Image, Cpu, HelpCircle, CheckSquare, Square, FolderInput, Download, Trash, X } from 'lucide-react';
 import { NoteCard } from './NoteCard';
+import { TrashNoteCard } from './TrashNoteCard';
 import { NoteStats } from './NoteStats';
 import { SearchFilters } from './SearchFilters';
 import { SideMenu } from './SideMenu';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
 import { CommandPalette } from './CommandPalette';
+import { Modal } from './ui';
 import { useNotesContext } from '../context/NotesContext';
 import { useKeyboardShortcuts } from '../hooks';
-import { APP_CONFIG, ARIA_LABELS } from '../constants';
+import { APP_CONFIG, ARIA_LABELS, FILTER_UNTAGGED, FILTER_TRASH } from '../constants';
 import type { Note, ViewType, TabType } from '../types';
 
 interface DashboardProps {
@@ -25,12 +27,14 @@ export const Dashboard = React.memo<DashboardProps>(({
   onNavigateToEditor,
   onCreateNote,
 }) => {
-  const { notes, theme, chat } = useNotesContext();
+  const { notes, theme, chat, folders } = useNotesContext();
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedFilters, setSelectedFilters] = React.useState<string[]>([]);
   const [selectedGroup, setSelectedGroup] = React.useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = React.useState(false);
   const [showCommandPalette, setShowCommandPalette] = React.useState(false);
+  const [selectedNoteIds, setSelectedNoteIds] = React.useState<string[]>([]);
+  const [showMoveToFolder, setShowMoveToFolder] = React.useState(false);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   useKeyboardShortcuts({
@@ -83,12 +87,26 @@ export const Dashboard = React.memo<DashboardProps>(({
   const filteredNotes = React.useMemo(() => {
     let result = notes.notes;
 
-    // Apply group filter (tag-based)
-    if (selectedGroup !== null) {
-      if (selectedGroup === '__untagged__') {
-        result = result.filter(note => !note.tags || note.tags.length === 0);
-      } else {
-        result = result.filter(note => note.tags?.includes(selectedGroup));
+    // First, apply trash filter
+    if (selectedGroup === FILTER_TRASH) {
+      // Show only deleted notes in trash view
+      result = result.filter(note => note.deletedAt);
+    } else {
+      // Exclude deleted notes from all other views
+      result = result.filter(note => !note.deletedAt);
+
+      // Apply group filter (folder or tag-based) only for non-trash views
+      if (selectedGroup !== null) {
+        if (selectedGroup.startsWith('folder:')) {
+          // Filter by folder
+          const folderId = selectedGroup.substring(7);
+          result = result.filter(note => note.folderId === folderId);
+        } else if (selectedGroup === FILTER_UNTAGGED) {
+          result = result.filter(note => !note.tags || note.tags.length === 0);
+        } else {
+          // Filter by tag
+          result = result.filter(note => note.tags?.includes(selectedGroup));
+        }
       }
     }
 
@@ -116,6 +134,15 @@ export const Dashboard = React.memo<DashboardProps>(({
       });
     }
 
+    // Sort: pinned notes first, then by creation date
+    result.sort((a, b) => {
+      // Pinned notes come first
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      // Then sort by creation date (newest first)
+      return (b.createdAt ?? 0) - (a.createdAt ?? 0);
+    });
+
     return result;
   }, [notes.notes, searchQuery, selectedFilters, selectedGroup]);
 
@@ -123,6 +150,68 @@ export const Dashboard = React.memo<DashboardProps>(({
     notes.setActiveNote(note);
     onNavigateToEditor(note, 'editor', 'notes', false);
   };
+
+  const handleToggleSelect = (noteId: string) => {
+    setSelectedNoteIds(prev =>
+      prev.includes(noteId)
+        ? prev.filter(id => id !== noteId)
+        : [...prev, noteId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedNoteIds.length === filteredNotes.length) {
+      setSelectedNoteIds([]);
+    } else {
+      setSelectedNoteIds(filteredNotes.map(note => note.id));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (window.confirm(`Delete ${selectedNoteIds.length} note(s)?`)) {
+      selectedNoteIds.forEach(noteId => notes.deleteNote(noteId));
+      setSelectedNoteIds([]);
+    }
+  };
+
+  const handleBulkMoveToFolder = (folderId: string | null) => {
+    selectedNoteIds.forEach(noteId => {
+      notes.updateNote(noteId, { folderId: folderId === 'none' ? undefined : folderId });
+    });
+    setSelectedNoteIds([]);
+    setShowMoveToFolder(false);
+  };
+
+  const handleBulkExport = () => {
+    const selectedNotes = notes.notes.filter(note => selectedNoteIds.includes(note.id));
+    const exportData = selectedNotes.map(note => ({
+      title: note.title,
+      content: note.summaryText || note.verbatimText || note.userNotes || '',
+      tags: note.tags,
+      createdAt: new Date(note.createdAt).toISOString(),
+    }));
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `notes-export-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setSelectedNoteIds([]);
+  };
+
+  const isSelectionMode = selectedNoteIds.length > 0;
+
+  const pinnedNotes = React.useMemo(() => {
+    return filteredNotes.filter(note => note.isPinned);
+  }, [filteredNotes]);
+
+  const unpinnedNotes = React.useMemo(() => {
+    return filteredNotes.filter(note => !note.isPinned);
+  }, [filteredNotes]);
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950">
@@ -146,22 +235,34 @@ export const Dashboard = React.memo<DashboardProps>(({
                 {APP_CONFIG.APP_NAME}
               </h1>
               <p className="text-slate-500 dark:text-slate-400 text-xs">
-                {selectedGroup && selectedGroup !== '__untagged__' ? (
+                {selectedGroup && selectedGroup !== FILTER_UNTAGGED ? (
                   <span className="flex items-center gap-1">
                     <span className="text-blue-600 dark:text-blue-400 font-medium">
                       {selectedGroup}
                     </span>
                     <span className="text-slate-400">({filteredNotes.length})</span>
                   </span>
-                ) : selectedGroup === '__untagged__' ? (
+                ) : selectedGroup === FILTER_UNTAGGED ? (
                   <span>Untagged ({filteredNotes.length})</span>
+                ) : selectedGroup === FILTER_TRASH ? (
+                  <span>Trash ({filteredNotes.length})</span>
                 ) : (
-                  <>{notes.notes.length} notes {searchQuery && `- ${filteredNotes.length} found`}</>
+                  <>{notes.notes.filter(n => !n.deletedAt).length} notes {searchQuery && `- ${filteredNotes.length} found`}</>
                 )}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {selectedGroup !== FILTER_TRASH && filteredNotes.length > 0 && (
+              <button
+                onClick={handleSelectAll}
+                className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                title={selectedNoteIds.length === filteredNotes.length ? "Deselect all" : "Select all"}
+                aria-label={selectedNoteIds.length === filteredNotes.length ? "Deselect all" : "Select all"}
+              >
+                {selectedNoteIds.length === filteredNotes.length ? <CheckSquare size={18} /> : <Square size={18} />}
+              </button>
+            )}
             <button
               onClick={() => setShowShortcuts(true)}
               className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
@@ -255,20 +356,103 @@ export const Dashboard = React.memo<DashboardProps>(({
               <p className="text-slate-500 dark:text-slate-400 text-sm">No notes match your search</p>
             </div>
           )
-        ) : (
+        ) : selectedGroup === FILTER_TRASH ? (
           filteredNotes.map((note) => (
-            <NoteCard
+            <TrashNoteCard
               key={note.id}
               note={note}
               onClick={handleNoteClick}
-              onDelete={notes.deleteNote}
+              onRestore={notes.restoreNote}
+              onPermanentDelete={notes.permanentlyDeleteNote}
             />
           ))
+        ) : (
+          <>
+            {pinnedNotes.length > 0 && (
+              <>
+                <div className="flex items-center gap-2 px-1 pt-2">
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+                  <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Pinned</span>
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+                </div>
+                {pinnedNotes.map((note) => (
+                  <NoteCard
+                    key={note.id}
+                    note={note}
+                    onClick={handleNoteClick}
+                    onDelete={notes.deleteNote}
+                    onTogglePin={notes.togglePin}
+                    isSelected={selectedNoteIds.includes(note.id)}
+                    onToggleSelect={handleToggleSelect}
+                    isSelectionMode={isSelectionMode}
+                  />
+                ))}
+              </>
+            )}
+            {pinnedNotes.length > 0 && unpinnedNotes.length > 0 && (
+              <div className="flex items-center gap-2 px-1 pt-2">
+                <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Notes</span>
+                <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+              </div>
+            )}
+            {unpinnedNotes.map((note) => (
+              <NoteCard
+                key={note.id}
+                note={note}
+                onClick={handleNoteClick}
+                onDelete={notes.deleteNote}
+                onTogglePin={notes.togglePin}
+                isSelected={selectedNoteIds.includes(note.id)}
+                onToggleSelect={handleToggleSelect}
+                isSelectionMode={isSelectionMode}
+              />
+            ))}
+          </>
         )}
       </div>
 
+      {/* Bulk Action Bar */}
+      {isSelectionMode && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-slate-800 text-white rounded-xl shadow-2xl px-4 py-3 z-30 flex items-center gap-3 border border-slate-700">
+          <span className="text-sm font-medium">{selectedNoteIds.length} selected</span>
+          <div className="h-5 w-px bg-slate-700" />
+          <button
+            onClick={() => setShowMoveToFolder(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 rounded-lg transition-colors"
+            title="Move to folder"
+          >
+            <FolderInput size={16} />
+            <span>Move</span>
+          </button>
+          <button
+            onClick={handleBulkExport}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 rounded-lg transition-colors"
+            title="Export as JSON"
+          >
+            <Download size={16} />
+            <span>Export</span>
+          </button>
+          <button
+            onClick={handleBulkDelete}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+            title="Delete selected"
+          >
+            <Trash size={16} />
+            <span>Delete</span>
+          </button>
+          <button
+            onClick={() => setSelectedNoteIds([])}
+            className="ml-2 p-1.5 hover:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            title="Cancel"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Floating Action Buttons */}
-      <div className="fixed bottom-5 right-5 flex items-center gap-2 z-20">
+      <div className={`fixed bottom-5 right-5 flex items-center gap-2 z-20 transition-transform ${isSelectionMode ? 'translate-y-20' : ''}`}>
         <button
           onClick={() => chat.setIsChatOpen(true)}
           className="w-11 h-11 bg-slate-800 dark:bg-slate-700 text-white rounded-xl shadow-lg flex items-center justify-center hover:bg-slate-700 dark:hover:bg-slate-600 active:scale-95 transition-all"
@@ -305,6 +489,37 @@ export const Dashboard = React.memo<DashboardProps>(({
         onClose={() => setShowCommandPalette(false)}
         commands={commands}
       />
+
+      {/* Move to Folder Modal */}
+      <Modal
+        isOpen={showMoveToFolder}
+        onClose={() => setShowMoveToFolder(false)}
+        title="Move to Folder"
+        size="sm"
+      >
+        <div className="space-y-2">
+          <button
+            onClick={() => handleBulkMoveToFolder('none')}
+            className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
+          >
+            None (Remove from folder)
+          </button>
+          {folders.folders.map(folder => (
+            <button
+              key={folder.id}
+              onClick={() => handleBulkMoveToFolder(folder.id)}
+              className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              {folder.name}
+            </button>
+          ))}
+          {folders.folders.length === 0 && (
+            <p className="text-sm text-slate-500 dark:text-slate-400 px-3 py-4 text-center">
+              No folders created yet
+            </p>
+          )}
+        </div>
+      </Modal>
         </div>
       </div>
     </div>

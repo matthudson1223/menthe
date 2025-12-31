@@ -1,11 +1,13 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useNotes } from '../hooks/useNotes';
+import { useFolders } from '../hooks/useFolders';
 import { useNoteProcessing } from '../hooks/useNoteProcessing';
 import { useChat } from '../hooks/useChat';
 import { useTheme } from '../hooks/useTheme';
 import { useRecording } from '../hooks/useRecording';
 import type {
   UseNotesReturn,
+  UseFoldersReturn,
   UseNoteProcessingReturn,
   UseChatReturn,
   UseThemeReturn,
@@ -14,6 +16,7 @@ import type {
 
 interface NotesContextValue {
   notes: UseNotesReturn;
+  folders: UseFoldersReturn;
   processing: UseNoteProcessingReturn;
   chat: UseChatReturn;
   theme: UseThemeReturn;
@@ -24,6 +27,7 @@ const NotesContext = createContext<NotesContextValue | undefined>(undefined);
 
 export function NotesProvider({ children }: { children: ReactNode }) {
   const notes = useNotes();
+  const folders = useFolders();
   const processing = useNoteProcessing(notes.updateNote);
   const chat = useChat();
   const theme = useTheme();
@@ -31,6 +35,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
   const value: NotesContextValue = {
     notes,
+    folders,
     processing,
     chat,
     theme,

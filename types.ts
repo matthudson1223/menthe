@@ -21,8 +21,18 @@ export interface Note {
   summaryText: string;
   tags: string[]; // User-defined tags for organization
   createdAt: number;
+  updatedAt?: number; // Last modification timestamp for sync conflict resolution
   isProcessing: boolean;
   driveFileId?: string; // Google Drive file ID for saved files
+  deletedAt?: number; // Soft delete timestamp - when note was moved to trash
+  isPinned?: boolean; // Pin note to top of list
+  folderId?: string; // Folder assignment for organization
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  createdAt: number;
 }
 
 export enum GeminiModel {
@@ -61,6 +71,10 @@ export interface NoteCardProps {
   note: Note;
   onClick: (note: Note) => void;
   onDelete: (noteId: string) => void;
+  onTogglePin?: (noteId: string) => void;
+  isSelected?: boolean;
+  onToggleSelect?: (noteId: string) => void;
+  isSelectionMode?: boolean;
 }
 
 export interface ProcessingOverlayProps {
@@ -75,6 +89,17 @@ export interface UseNotesReturn {
   createNote: (type: NoteType, initialData?: { url?: string; text?: string }) => Note;
   updateNote: (id: string, updates: Partial<Note>) => void;
   deleteNote: (noteId: string) => void;
+  restoreNote: (noteId: string) => void;
+  permanentlyDeleteNote: (noteId: string) => void;
+  togglePin: (noteId: string) => void;
+  syncWithDrive?: (accessToken: string) => Promise<void>;
+}
+
+export interface UseFoldersReturn {
+  folders: Folder[];
+  createFolder: (name: string) => Folder;
+  deleteFolder: (id: string) => void;
+  renameFolder: (id: string, name: string) => void;
 }
 
 export interface UseNoteProcessingReturn {
