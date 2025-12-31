@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Wand2, ArrowLeft, Sparkles, BrainCircuit, Edit2, Check } from 'lucide-react';
+import { Wand2, ArrowLeft, Sparkles, BrainCircuit, Edit2, Check, ListTodo, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { TagManager } from '../TagManager';
+import { useSettings } from '../../context/SettingsContext';
+import { generateActionItems } from '../../services/geminiService';
 import type { Note } from '../../types';
 import { debounce } from '../../utils/helpers';
 
@@ -18,11 +20,14 @@ export const SummaryTab = React.memo<SummaryTabProps>(({
   onUpdate,
   onRefine,
 }) => {
+  const { settings } = useSettings();
   const [isEditingSummary, setIsEditingSummary] = useState(false);
   const [refineInput, setRefineInput] = useState('');
   const [isRefining, setIsRefining] = useState(false);
   const [localSummary, setLocalSummary] = useState(note.summaryText || '');
   const [isSummaryFocused, setIsSummaryFocused] = useState(false);
+  const [isExtractingActions, setIsExtractingActions] = useState(false);
+  const [localActionItems, setLocalActionItems] = useState(note.actionItems || '');
 
   // Debounced update function for summary
   const debouncedUpdateSummary = useMemo(
@@ -38,6 +43,11 @@ export const SummaryTab = React.memo<SummaryTabProps>(({
       setLocalSummary(note.summaryText || '');
     }
   }, [note.summaryText, isSummaryFocused, localSummary]);
+
+  // Sync action items from note
+  useEffect(() => {
+    setLocalActionItems(note.actionItems || '');
+  }, [note.actionItems]);
 
   const handleSummaryChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
@@ -56,6 +66,26 @@ export const SummaryTab = React.memo<SummaryTabProps>(({
       console.error('Refinement failed', error);
     } finally {
       setIsRefining(false);
+    }
+  };
+
+  const handleExtractActionItems = async () => {
+    // Use summary text if available, otherwise use verbatim text
+    const textToAnalyze = note.summaryText || note.verbatimText || note.userNotes;
+    if (!textToAnalyze) return;
+
+    setIsExtractingActions(true);
+    try {
+      const actionItems = await generateActionItems(
+        textToAnalyze,
+        settings.aiConfig.actionItemsPrompt
+      );
+      setLocalActionItems(actionItems);
+      onUpdate({ actionItems });
+    } catch (error) {
+      console.error('Action items extraction failed', error);
+    } finally {
+      setIsExtractingActions(false);
     }
   };
 
@@ -151,6 +181,54 @@ export const SummaryTab = React.memo<SummaryTabProps>(({
             note={note}
             updateNote={onUpdate}
           />
+        </div>
+      )}
+
+      {/* Action Items Section */}
+      {note.summaryText && (
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+              <ListTodo size={12} /> Action Items
+            </label>
+            {localActionItems && (
+              <button
+                onClick={handleExtractActionItems}
+                disabled={isExtractingActions}
+                className="text-xs text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors disabled:opacity-50"
+              >
+                {isExtractingActions ? 'Regenerating...' : 'Regenerate'}
+              </button>
+            )}
+          </div>
+
+          {localActionItems ? (
+            <div className="prose dark:prose-invert prose-sm max-w-none prose-ul:my-1 prose-li:my-0.5">
+              <ReactMarkdown>{localActionItems}</ReactMarkdown>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-6">
+              {isExtractingActions ? (
+                <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                  <Loader2 size={18} className="animate-spin" />
+                  <span className="text-sm">Extracting action items...</span>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-400 dark:text-slate-500 mb-3 text-center">
+                    No action items extracted yet
+                  </p>
+                  <button
+                    onClick={handleExtractActionItems}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg transition-colors"
+                  >
+                    <ListTodo size={16} />
+                    Extract Action Items
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

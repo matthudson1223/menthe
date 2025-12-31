@@ -19,6 +19,7 @@ export interface Note {
   imageTranscript?: string; // image-derived text, stored for summarization
   userNotes?: string; // Manual user notes separate from transcript
   summaryText: string;
+  actionItems?: string; // AI-extracted action items as Markdown checklist
   tags: string[]; // User-defined tags for organization
   createdAt: number;
   updatedAt?: number; // Last modification timestamp for sync conflict resolution
@@ -69,13 +70,20 @@ export interface ExportDefaults {
   pdfFormat: PdfFormat;
 }
 
+export interface AiConfig {
+  summaryPrompt: string;
+  titlePrompt: string;
+  actionItemsPrompt: string;
+}
+
 export interface AppSettings {
   themeMode: ThemeMode;
   exportDefaults: ExportDefaults;
+  aiConfig: AiConfig;
   apiKey?: string; // For self-hosted/custom API usage
 }
 
-export type SettingsTabType = 'general' | 'appearance' | 'export' | 'account';
+export type SettingsTabType = 'general' | 'appearance' | 'export' | 'ai' | 'account';
 
 // Storage Types
 export interface StorageData {

@@ -30,18 +30,31 @@ if (!GEMINI_API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
-const buildPromptForSummary = (transcript, userNotes) => {
-  return `Analyze the following content and provide a comprehensive summary.
+const DEFAULT_SUMMARY_PROMPT = `Analyze the following content and provide a comprehensive summary.
 
 The content consists of a transcript (from audio or image) and user-written notes. Combine insights from both sources.
 
 TRANSCRIPT:
-${transcript || "(No transcript provided)"}
+{{transcript}}
 
 USER NOTES:
-${userNotes || "(No user notes provided)"}
+{{userNotes}}
 
 Use markdown formatting (headers, bullet points, bold text) to organize the information clearly and make it easy to read.`;
+
+const DEFAULT_TITLE_PROMPT = `Generate a short, concise title (max 6 words) for this note based on the content:
+
+{{text}}`;
+
+const DEFAULT_ACTION_ITEMS_PROMPT = `Identify and list key action items, to-dos, and next steps from the following text. Return them as a Markdown checklist.
+
+{{text}}`;
+
+const buildPromptForSummary = (transcript, userNotes, customPrompt = null) => {
+  const template = customPrompt || DEFAULT_SUMMARY_PROMPT;
+  return template
+    .replace('{{transcript}}', transcript || "(No transcript provided)")
+    .replace('{{userNotes}}', userNotes || "(No user notes provided)");
 };
 
 app.post("/api/gemini/transcribe-image", async (req, res) => {
@@ -110,9 +123,9 @@ app.post("/api/gemini/transcribe-audio", async (req, res) => {
 
 app.post("/api/gemini/summary", async (req, res) => {
   try {
-    const { transcript, userNotes } = req.body ?? {};
+    const { transcript, userNotes, customPrompt } = req.body ?? {};
 
-    const prompt = buildPromptForSummary(transcript ?? "", userNotes ?? "");
+    const prompt = buildPromptForSummary(transcript ?? "", userNotes ?? "", customPrompt);
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-pro",
@@ -143,22 +156,18 @@ app.post("/api/gemini/summary", async (req, res) => {
 
 app.post("/api/gemini/title", async (req, res) => {
   try {
-    const { text } = req.body ?? {};
+    const { text, customPrompt } = req.body ?? {};
     if (!text) {
       return res.status(400).json({ error: "text is required" });
     }
 
+    const promptTemplate = customPrompt || DEFAULT_TITLE_PROMPT;
+    const prompt = promptTemplate.replace('{{text}}', text.substring(0, 1000));
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-lite",
       contents: {
-        parts: [
-          {
-            text: `Generate a short, concise title (max 6 words) for this note based on the content:\n\n${text.substring(
-              0,
-              1000,
-            )}`,
-          },
-        ],
+        parts: [{ text: prompt }],
       },
     });
 
@@ -167,6 +176,31 @@ app.post("/api/gemini/title", async (req, res) => {
     // eslint-disable-next-line no-console
     console.error("Titling error:", err);
     res.status(500).json({ error: "Title generation failed" });
+  }
+});
+
+app.post("/api/gemini/actions", async (req, res) => {
+  try {
+    const { text, customPrompt } = req.body ?? {};
+    if (!text) {
+      return res.status(400).json({ error: "text is required" });
+    }
+
+    const promptTemplate = customPrompt || DEFAULT_ACTION_ITEMS_PROMPT;
+    const prompt = promptTemplate.replace('{{text}}', text);
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: {
+        parts: [{ text: prompt }],
+      },
+    });
+
+    res.json({ actionItems: response.text?.trim() || "" });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("Action items extraction error:", err);
+    res.status(500).json({ error: "Action items extraction failed" });
   }
 });
 

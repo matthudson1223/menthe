@@ -7,14 +7,15 @@ import React, {
   ReactNode,
 } from 'react';
 import { storageService } from '../services/storageService';
-import { STORAGE_KEYS, DEFAULT_SETTINGS } from '../constants';
-import type { AppSettings, ThemeMode, ExportDefaults } from '../types';
+import { DEFAULT_SETTINGS } from '../constants';
+import type { AppSettings, ThemeMode, ExportDefaults, AiConfig } from '../types';
 
 interface SettingsContextValue {
   settings: AppSettings;
   loading: boolean;
   updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
   updateExportDefault: <K extends keyof ExportDefaults>(key: K, value: ExportDefaults[K]) => void;
+  updateAiConfig: <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
   resetSettings: () => void;
 }
 
@@ -24,6 +25,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>({
     themeMode: DEFAULT_SETTINGS.themeMode,
     exportDefaults: { ...DEFAULT_SETTINGS.exportDefaults },
+    aiConfig: { ...DEFAULT_SETTINGS.aiConfig },
   });
   const [loading, setLoading] = useState(true);
 
@@ -38,6 +40,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             exportDefaults: {
               ...DEFAULT_SETTINGS.exportDefaults,
               ...saved.exportDefaults,
+            },
+            aiConfig: {
+              ...DEFAULT_SETTINGS.aiConfig,
+              ...saved.aiConfig,
             },
             apiKey: saved.apiKey,
           });
@@ -81,10 +87,24 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const updateAiConfig = useCallback(<K extends keyof AiConfig>(
+    key: K,
+    value: AiConfig[K]
+  ) => {
+    setSettings(prev => ({
+      ...prev,
+      aiConfig: {
+        ...prev.aiConfig,
+        [key]: value,
+      },
+    }));
+  }, []);
+
   const resetSettings = useCallback(() => {
     setSettings({
       themeMode: DEFAULT_SETTINGS.themeMode,
       exportDefaults: { ...DEFAULT_SETTINGS.exportDefaults },
+      aiConfig: { ...DEFAULT_SETTINGS.aiConfig },
     });
   }, []);
 
@@ -93,6 +113,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     loading,
     updateSetting,
     updateExportDefault,
+    updateAiConfig,
     resetSettings,
   };
 

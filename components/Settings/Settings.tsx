@@ -10,12 +10,14 @@ import {
   Moon,
   AlertTriangle,
   Check,
+  Brain,
+  RotateCcw,
 } from 'lucide-react';
 import { useNotesContext } from '../../context/NotesContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useAuth } from '../../context/AuthContext';
 import { Modal } from '../ui';
-import { APP_CONFIG } from '../../constants';
+import { APP_CONFIG, DEFAULT_AI_PROMPTS } from '../../constants';
 import type { SettingsTabType, ThemeMode, PdfFormat } from '../../types';
 
 interface SettingsProps {
@@ -25,7 +27,7 @@ interface SettingsProps {
 export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   const [activeTab, setActiveTab] = useState<SettingsTabType>('general');
   const { theme, notes } = useNotesContext();
-  const { settings, updateSetting, updateExportDefault, resetSettings } = useSettings();
+  const { settings, updateSetting, updateExportDefault, updateAiConfig, resetSettings } = useSettings();
   const { user, updateUserProfile, deleteAccount } = useAuth();
 
   // Account state
@@ -49,6 +51,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     { id: 'general', label: 'General', icon: <SettingsIcon size={18} /> },
     { id: 'appearance', label: 'Appearance', icon: <Palette size={18} /> },
     { id: 'export', label: 'Export', icon: <Download size={18} /> },
+    { id: 'ai', label: 'AI & Prompts', icon: <Brain size={18} /> },
     { id: 'account', label: 'Account', icon: <User size={18} /> },
   ];
 
@@ -303,6 +306,101 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+        );
+
+      case 'ai':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-1">
+                AI & Prompts
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Customize AI prompts for summary, title generation, and action item extraction
+              </p>
+            </div>
+
+            {/* Summary Prompt */}
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h4 className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                    Summary Prompt
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Use {'{{transcript}}'} and {'{{userNotes}}'} as placeholders
+                  </p>
+                </div>
+                <button
+                  onClick={() => updateAiConfig('summaryPrompt', DEFAULT_AI_PROMPTS.summaryPrompt)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                  title="Reset to default"
+                >
+                  <RotateCcw size={16} />
+                </button>
+              </div>
+              <textarea
+                value={settings.aiConfig.summaryPrompt}
+                onChange={(e) => updateAiConfig('summaryPrompt', e.target.value)}
+                rows={6}
+                className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors resize-none font-mono"
+              />
+            </div>
+
+            {/* Title Prompt */}
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h4 className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                    Title Generation Prompt
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Use {'{{text}}'} as a placeholder for note content
+                  </p>
+                </div>
+                <button
+                  onClick={() => updateAiConfig('titlePrompt', DEFAULT_AI_PROMPTS.titlePrompt)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                  title="Reset to default"
+                >
+                  <RotateCcw size={16} />
+                </button>
+              </div>
+              <textarea
+                value={settings.aiConfig.titlePrompt}
+                onChange={(e) => updateAiConfig('titlePrompt', e.target.value)}
+                rows={4}
+                className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors resize-none font-mono"
+              />
+            </div>
+
+            {/* Action Items Prompt */}
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h4 className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                    Action Items Prompt
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Use {'{{text}}'} as a placeholder for note content
+                  </p>
+                </div>
+                <button
+                  onClick={() => updateAiConfig('actionItemsPrompt', DEFAULT_AI_PROMPTS.actionItemsPrompt)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                  title="Reset to default"
+                >
+                  <RotateCcw size={16} />
+                </button>
+              </div>
+              <textarea
+                value={settings.aiConfig.actionItemsPrompt}
+                onChange={(e) => updateAiConfig('actionItemsPrompt', e.target.value)}
+                rows={4}
+                className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors resize-none font-mono"
+              />
             </div>
           </div>
         );

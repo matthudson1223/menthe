@@ -64,13 +64,17 @@ export const transcribeAudio = async (base64Audio: string, mimeType: string): Pr
   }
 };
 
-export const generateSummary = async (transcript: string, userNotes: string = ""): Promise<string> => {
+export const generateSummary = async (
+  transcript: string,
+  userNotes: string = "",
+  customPrompt?: string
+): Promise<string> => {
   try {
     // Using Pro with Thinking for deep analysis
     const response = await fetch(buildUrl("/api/gemini/summary"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transcript, userNotes }),
+      body: JSON.stringify({ transcript, userNotes, customPrompt }),
     });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -86,12 +90,12 @@ export const generateSummary = async (transcript: string, userNotes: string = ""
   }
 };
 
-export const generateTitle = async (text: string): Promise<string> => {
+export const generateTitle = async (text: string, customPrompt?: string): Promise<string> => {
   try {
     const response = await fetch(buildUrl("/api/gemini/title"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, customPrompt }),
     });
     if (!response.ok) {
       throw new Error("Title generation failed");
@@ -118,6 +122,24 @@ export const refineSummary = async (currentSummary: string, instruction: string)
     return data.text ?? "";
   } catch (error) {
     console.error("Refinement error:", error);
+    throw error;
+  }
+};
+
+export const generateActionItems = async (text: string, customPrompt?: string): Promise<string> => {
+  try {
+    const response = await fetch(buildUrl("/api/gemini/actions"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, customPrompt }),
+    });
+    if (!response.ok) {
+      throw new Error("Action items extraction failed");
+    }
+    const data = await response.json();
+    return data.actionItems ?? "";
+  } catch (error) {
+    console.error("Action items extraction error:", error);
     throw error;
   }
 };

@@ -96,6 +96,27 @@ export const ANIMATION = {
 export const FILTER_UNTAGGED = '__untagged__';
 export const FILTER_TRASH = '__trash__';
 
+// Default AI Prompts
+export const DEFAULT_AI_PROMPTS = {
+  summaryPrompt: `Analyze the following content and provide a comprehensive summary.
+
+The content consists of a transcript (from audio or image) and user-written notes. Combine insights from both sources.
+
+TRANSCRIPT:
+{{transcript}}
+
+USER NOTES:
+{{userNotes}}
+
+Use markdown formatting (headers, bullet points, bold text) to organize the information clearly and make it easy to read.`,
+  titlePrompt: `Generate a short, concise title (max 6 words) for this note based on the content:
+
+{{text}}`,
+  actionItemsPrompt: `Identify and list key action items, to-dos, and next steps from the following text. Return them as a Markdown checklist.
+
+{{text}}`,
+} as const;
+
 // Default Settings
 export const DEFAULT_SETTINGS = {
   themeMode: 'system' as const,
@@ -103,5 +124,10 @@ export const DEFAULT_SETTINGS = {
     includeTags: true,
     includeSummary: true,
     pdfFormat: 'a4' as const,
+  },
+  aiConfig: {
+    summaryPrompt: DEFAULT_AI_PROMPTS.summaryPrompt,
+    titlePrompt: DEFAULT_AI_PROMPTS.titlePrompt,
+    actionItemsPrompt: DEFAULT_AI_PROMPTS.actionItemsPrompt,
   },
 } as const;
