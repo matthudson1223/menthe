@@ -1,5 +1,5 @@
 import localforage from 'localforage';
-import { Note } from '../types';
+import { Note, AppSettings } from '../types';
 import { STORAGE_KEYS, APP_CONFIG } from '../constants';
 
 // Configure localforage to use IndexedDB
@@ -150,6 +150,22 @@ class StorageService {
   getSystemTheme(): 'light' | 'dark' {
     if (typeof window === 'undefined') return 'light';
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  /**
+   * Get settings from storage (async)
+   */
+  async getSettings(): Promise<AppSettings | null> {
+    await this.initialized;
+    return this.getItem<AppSettings>(STORAGE_KEYS.SETTINGS);
+  }
+
+  /**
+   * Save settings to storage (async)
+   */
+  async saveSettings(settings: AppSettings): Promise<boolean> {
+    await this.initialized;
+    return this.setItem(STORAGE_KEYS.SETTINGS, settings);
   }
 
   /**

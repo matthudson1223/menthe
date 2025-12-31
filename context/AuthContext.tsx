@@ -3,6 +3,7 @@ import React, {
   useContext,
   useEffect,
   useState,
+  useCallback,
   ReactNode,
 } from 'react';
 import {
@@ -12,8 +13,19 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  updateProfile,
+  deleteUser,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
+  EmailAuthProvider,
+  GoogleAuthProvider,
 } from 'firebase/auth';
 import { auth, googleAuthProvider } from '../services/firebase';
+
+interface ProfileUpdateData {
+  displayName?: string;
+  photoURL?: string;
+}
 
 interface AuthContextValue {
   user: User | null;
@@ -22,6 +34,9 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
+  updateUserProfile: (data: ProfileUpdateData) => Promise<void>;
+  deleteAccount: (password?: string) => Promise<void>;
+  reauthenticate: (password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -55,6 +70,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await createUserWithEmailAndPassword(auth, email, password);
   };
 
+  const updateUserProfile = useCallback(async (data: ProfileUpdateData) => {
+    if (!auth.currentUser) {
+      throw new Error('No user is currently signed in');
+    }
+    await updateProfile(auth.currentUser, {
+      displayName: data.displayName,
+      photoURL: data.photoURL,
+    });
+    // Force refresh the user state to get updated profile
+    setUser({ ...auth.currentUser });
+  }, []);
+
+  const reauthenticate = useCallback(async (password: string) => {
+    if (!auth.currentUser || !auth.currentUser.email) {
+      throw new Error('No user is currently signed in');
+    }
+    const credential = EmailAuthProvider.credential(
+      auth.currentUser.email,
+      password
+    );
+    await reauthenticateWithCredential(auth.currentUser, credential);
+  }, []);
+
+  const deleteAccount = useCallback(async (password?: string) => {
+    if (!auth.currentUser) {
+      throw new Error('No user is currently signed in');
+    }
+
+    // Check if user signed in with Google
+    const isGoogleUser = auth.currentUser.providerData.some(
+      (provider) => provider.providerId === 'google.com'
+    );
+
+    // Re-authenticate before deletion for security
+    if (isGoogleUser) {
+      // For Google users, re-authenticate with popup
+      await reauthenticateWithPopup(auth.currentUser, new GoogleAuthProvider());
+    } else if (password) {
+      // For email/password users, use provided password
+      await reauthenticate(password);
+    } else {
+      throw new Error('Password is required for account deletion');
+    }
+
+    // Delete the user account
+    await deleteUser(auth.currentUser);
+  }, [reauthenticate]);
+
   const value: AuthContextValue = {
     user,
     loading,
@@ -62,6 +125,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut,
     signInWithEmail,
     signUpWithEmail,
+    updateUserProfile,
+    deleteAccount,
+    reauthenticate,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

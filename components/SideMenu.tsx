@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Menu, X, Tag, FolderOpen, LogOut, FileText, Trash2, Folder, Plus, MoreVertical, Edit2, Trash } from 'lucide-react';
+import { Menu, X, Tag, FolderOpen, LogOut, FileText, Trash2, Folder, Plus, MoreVertical, Edit2, Trash, Settings } from 'lucide-react';
 import { useNotesContext } from '../context/NotesContext';
 import { useAuth } from '../context/AuthContext';
 import { Modal } from './ui';
@@ -8,11 +8,13 @@ import { FILTER_UNTAGGED, FILTER_TRASH } from '../constants';
 interface SideMenuProps {
   selectedGroup: string | null;
   onGroupSelect: (group: string | null) => void;
+  onOpenSettings?: () => void;
 }
 
 export const SideMenu: React.FC<SideMenuProps> = ({
   selectedGroup,
   onGroupSelect,
+  onOpenSettings,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
@@ -272,6 +274,18 @@ export const SideMenu: React.FC<SideMenuProps> = ({
         </div>
 
         <div className="p-3 border-t border-slate-100 dark:border-slate-800">
+          {onOpenSettings && (
+            <button
+              onClick={() => {
+                onOpenSettings();
+                setIsOpen(false);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors mb-2"
+            >
+              <Settings size={15} />
+              <span>Settings</span>
+            </button>
+          )}
           {user && (
             <p className="text-xs text-slate-400 mb-2 truncate px-1">{user.email}</p>
           )}
